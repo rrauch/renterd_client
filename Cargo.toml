@@ -1,0 +1,18 @@
+[package]
+name = "renterd_client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["rustls-tls-native-roots"] }
+thiserror = "1.0"
+url = "2.5"
+zeroize = "1.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+bigdecimal = { version = "0.4", features = ["serde-json"] }
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+anyhow = "1.0"
