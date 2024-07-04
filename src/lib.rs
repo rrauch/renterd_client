@@ -3,6 +3,7 @@ use reqwest::{Client as ReqwestClient, Response};
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
+use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
@@ -127,6 +128,12 @@ pub enum InvalidDataError {
     InvalidHash(String),
     #[error("unsupported hash {0}")]
     UnsupportedHash(String),
+    #[error("invalid fcid {0}")]
+    InvalidFileContractId(String),
+    #[error("unsupported fcid {0}")]
+    UnsupportedFileContractId(String),
+    #[error("invalid settings id {0}")]
+    InvalidSettingsId(String),
 }
 
 pub struct ClientBuilder {
@@ -219,7 +226,7 @@ impl ClientBuilder {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub enum PublicKey {
     Ed25519([u8; 32]),
 }
@@ -345,6 +352,206 @@ impl<'de> Visitor<'de> for HashVisitor {
 
 struct HashVisitor;
 
+#[derive(PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
+pub enum FileContractId {
+    Hash256([u8; 32]),
+}
+
+impl Display for FileContractId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileContractId::Hash256(bytes) => {
+                f.write_fmt(format_args!("fcid:{}", hex::encode(bytes)))
+            }
+        }
+    }
+}
+
+impl Debug for FileContractId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.to_string()))
+    }
+}
+
+impl TryFrom<&str> for FileContractId {
+    type Error = InvalidDataError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.strip_prefix("fcid:") {
+            Some(hex) => {
+                let mut bytes = [0u8; 32];
+                hex::decode_to_slice(hex, &mut bytes)
+                    .map_err(|_| InvalidDataError::InvalidFileContractId(s.to_string()))?;
+                Ok(FileContractId::Hash256(bytes))
+            }
+            None => Err(InvalidDataError::UnsupportedFileContractId(s.to_string())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FileContractId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(FileContractIdVisitor)
+    }
+}
+
+impl<'de> Visitor<'de> for FileContractIdVisitor {
+    type Value = FileContractId;
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v.try_into().map_err(|e| serde::de::Error::custom(e))?)
+    }
+}
+
+struct FileContractIdVisitor;
+
+pub(crate) mod duration_ns {
+    use bigdecimal::ToPrimitive;
+    use serde::de::Visitor;
+    use serde::{Deserializer, Serializer};
+    use std::fmt::Formatter;
+    use std::time::Duration;
+
+    pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: AsRef<Duration>,
+        S: Serializer,
+    {
+        Ok(
+            serializer.serialize_u64(v.as_ref().as_nanos().to_u64().ok_or(
+                serde::ser::Error::custom("nanoseconds cannot be represented as u64"),
+            )?)?,
+        )
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_u64(DurationVisitor)
+    }
+
+    struct DurationVisitor;
+    impl<'de> Visitor<'de> for DurationVisitor {
+        type Value = Duration;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("a nanosecond number")
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(std::time::Duration::from_nanos(v))
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
+pub struct SettingsId([u8; 16]);
+
+impl Display for SettingsId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{}", hex::encode(self.0)))
+    }
+}
+
+impl Debug for SettingsId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{}", self.to_string()))
+    }
+}
+
+impl TryFrom<&str> for SettingsId {
+    type Error = InvalidDataError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let mut bytes = [0u8; 16];
+        hex::decode_to_slice(s, &mut bytes)
+            .map_err(|_| InvalidDataError::InvalidSettingsId(s.to_string()))?;
+        Ok(SettingsId(bytes))
+    }
+}
+
+impl<'de> Deserialize<'de> for SettingsId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(SettingsIdVisitor)
+    }
+}
+
+struct SettingsIdVisitor;
+
+impl<'de> Visitor<'de> for SettingsIdVisitor {
+    type Value = SettingsId;
+
+    fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v.try_into().map_err(|e| serde::de::Error::custom(e))?)
+    }
+}
+
+fn deserialize_option_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringVisitor;
+
+    impl<'de> Visitor<'de> for StringVisitor {
+        type Value = Option<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or null")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Option<String>, E>
+        where
+            E: serde::de::Error,
+        {
+            if value.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(value.to_owned()))
+            }
+        }
+
+        fn visit_none<E>(self) -> Result<Option<String>, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Option<String>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_str(self)
+        }
+    }
+
+    deserializer.deserialize_option(StringVisitor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +597,43 @@ mod tests {
         ) {
             Err(InvalidDataError::UnsupportedHash(_)) => {}
             _ => panic!("unsupported hash error expected"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn fcid_handling() -> anyhow::Result<()> {
+        let valid_str = "fcid:d41536902fedd6717e16839df5a6022c1d0663ebc2f44f8ad4a7bb743313dabd";
+        let valid_fcid: FileContractId = valid_str.try_into()?;
+        assert_eq!(valid_str, valid_fcid.to_string());
+
+        match TryInto::<FileContractId>::try_into(
+            "fcid:f78694e6db65d95389eb271a9239810701a7f1df199564f51b1fc6c1c7935d",
+        ) {
+            Err(InvalidDataError::InvalidFileContractId(_)) => {}
+            _ => panic!("invalid fcid error expected"),
+        }
+
+        match TryInto::<FileContractId>::try_into(
+            "foo:d41536902fedd6717e16839df5a6022c1d0663ebc2f44f8ad4a7bb743313dabd",
+        ) {
+            Err(InvalidDataError::UnsupportedFileContractId(_)) => {}
+            _ => panic!("unsupported fcid error expected"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn settings_id_handling() -> anyhow::Result<()> {
+        let valid_str = "defb754518682448a13b2e30fff7c2ae";
+        let valid_id: SettingsId = valid_str.try_into()?;
+        assert_eq!(valid_str, valid_id.to_string());
+
+        match TryInto::<SettingsId>::try_into("defb754518682448a13b2e30fff7c2a") {
+            Err(InvalidDataError::InvalidSettingsId(_)) => {}
+            _ => panic!("invalid settings error expected"),
         }
 
         Ok(())
