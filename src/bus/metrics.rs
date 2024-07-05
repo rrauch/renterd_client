@@ -93,11 +93,11 @@ pub mod contract {
                     &self.inner,
                     "contract",
                     [
-                        contract_id.map(|id| ("contractID", id.to_string())),
-                        host_key.map(|key| ("hostKey", key.to_string())),
+                        contract_id.map(|i| ("contractID", i.to_string())),
+                        host_key.map(|k| ("hostKey", k.to_string())),
                     ]
                     .into_iter()
-                    .filter_map(|e| e)
+                    .flatten()
                     .collect(),
                     start,
                     interval,
@@ -247,12 +247,12 @@ pub mod churn {
                     &self.inner,
                     "churn",
                     [
-                        name.map(|name| ("name", name)),
-                        direction.map(|direction| ("direction", direction)),
-                        reason.map(|reason| ("reason", reason)),
+                        name.map(|n| ("name", n)),
+                        direction.map(|d| ("direction", d)),
+                        reason.map(|r| ("reason", r)),
                     ]
                     .into_iter()
-                    .filter_map(|e| e)
+                    .flatten()
                     .collect(),
                     start,
                     interval,
@@ -309,10 +309,7 @@ pub mod contract_set {
                 list(
                     &self.inner,
                     "contractset",
-                    [name.map(|name| ("name", name))]
-                        .into_iter()
-                        .filter_map(|e| e)
-                        .collect(),
+                    [name.map(|n| ("name", n))].into_iter().flatten().collect(),
                     start,
                     interval,
                     number_intervals,
@@ -367,12 +364,12 @@ pub mod contract_prune {
                     &self.inner,
                     "contractprune",
                     [
-                        contract_id.map(|contract_id| ("contractID", contract_id.to_string())),
-                        host_key.map(|host_key| ("hostKey", host_key.to_string())),
-                        host_version.map(|host_version| ("hostVersion", host_version)),
+                        contract_id.map(|c| ("contractID", c.to_string())),
+                        host_key.map(|h| ("hostKey", h.to_string())),
+                        host_version.map(|h| ("hostVersion", h)),
                     ]
                     .into_iter()
-                    .filter_map(|e| e)
+                    .flatten()
                     .collect(),
                     start,
                     interval,

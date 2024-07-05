@@ -6,6 +6,7 @@ pub mod consensus;
 pub mod contract;
 pub mod host;
 pub mod metrics;
+pub mod object;
 
 use crate::bus::account::Api as AccountApi;
 use crate::bus::alert::Api as AlertApi;
@@ -15,6 +16,7 @@ use crate::bus::consensus::Api as ConsensusApi;
 use crate::bus::contract::Api as ContractApi;
 use crate::bus::host::Api as HostApi;
 use crate::bus::metrics::Api as MetricsApi;
+use crate::bus::object::Api as ObjectApi;
 use crate::ClientInner;
 use std::sync::Arc;
 
@@ -28,6 +30,7 @@ pub struct Bus {
     contract: ContractApi,
     host: HostApi,
     metrics: MetricsApi,
+    object: ObjectApi,
 }
 
 impl Bus {
@@ -41,6 +44,7 @@ impl Bus {
             contract: ContractApi::new(inner.clone()),
             host: HostApi::new(inner.clone()),
             metrics: MetricsApi::new(inner.clone()),
+            object: ObjectApi::new(inner.clone()),
         }
     }
 
@@ -74,5 +78,9 @@ impl Bus {
 
     pub fn metrics(&self) -> &MetricsApi {
         &self.metrics
+    }
+
+    pub fn object(&self) -> &ObjectApi {
+        &self.object
     }
 }
