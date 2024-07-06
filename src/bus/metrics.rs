@@ -64,7 +64,6 @@ pub mod contract {
     use crate::bus::metrics::list;
     use crate::Error::InvalidDataError;
     use crate::{ClientInner, Error, FileContractId, PublicKey};
-    use bigdecimal::BigDecimal;
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -116,27 +115,26 @@ pub mod contract {
         #[serde(rename = "contractID")]
         pub contract_id: FileContractId,
         pub host_key: PublicKey,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub remaining_collateral: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub remaining_funds: BigDecimal,
+        #[serde(with = "crate::number_as_string")]
+        pub remaining_collateral: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub remaining_funds: u128,
         pub revision_number: u64,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub upload_spending: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub download_spending: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub fund_account_spending: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub delete_spending: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub list_spending: BigDecimal,
+        #[serde(with = "crate::number_as_string")]
+        pub upload_spending: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub download_spending: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub fund_account_spending: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub delete_spending: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub list_spending: u128,
     }
 
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::str::FromStr;
 
         #[test]
         fn deserialize_list() -> anyhow::Result<()> {
@@ -193,17 +191,17 @@ pub mod contract {
 
             assert_eq!(
                 metrics.get(1).unwrap().remaining_collateral,
-                BigDecimal::from_str("175701918250120093047546316")?
+                175701918250120093047546316
             );
 
             assert_eq!(
                 metrics.get(1).unwrap().remaining_funds,
-                BigDecimal::from_str("75044554735529963303116337")?
+                75044554735529963303116337
             );
 
             assert_eq!(
                 metrics.get(1).unwrap().upload_spending,
-                BigDecimal::from_str("4952248376059614389469184")?
+                4952248376059614389469184
             );
 
             assert_eq!(metrics.get(1).unwrap().revision_number, 6068);
@@ -402,7 +400,6 @@ pub mod wallet {
     use crate::bus::metrics::list;
     use crate::Error::InvalidDataError;
     use crate::{ClientInner, Error};
-    use bigdecimal::BigDecimal;
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -443,12 +440,12 @@ pub mod wallet {
     #[serde(rename_all(deserialize = "camelCase"))]
     pub struct Metric {
         pub timestamp: DateTime<FixedOffset>,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub confirmed: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub spendable: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub unconfirmed: BigDecimal,
+        #[serde(with = "crate::number_as_string")]
+        pub confirmed: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub spendable: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub unconfirmed: u128,
     }
 
     //todo: add tests when we have some test data

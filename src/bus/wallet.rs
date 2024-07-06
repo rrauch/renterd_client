@@ -1,6 +1,5 @@
 use crate::Error::InvalidDataError;
 use crate::{ClientInner, Error};
-use bigdecimal::BigDecimal;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -26,20 +25,18 @@ impl Api {
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Wallet {
     pub scan_height: u64,
-    pub address: String,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub spendable: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub confirmed: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub unconfirmed: BigDecimal,
+    pub address: String, //todo
+    #[serde(with = "crate::number_as_string")]
+    pub spendable: u128,
+    #[serde(with = "crate::number_as_string")]
+    pub confirmed: u128,
+    #[serde(with = "crate::number_as_string")]
+    pub unconfirmed: u128,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::bus::wallet::Wallet;
-    use bigdecimal::BigDecimal;
-    use std::str::FromStr;
 
     #[test]
     fn deserialize_wallet() -> anyhow::Result<()> {
@@ -54,15 +51,9 @@ mod tests {
 "#;
         let wallet: Wallet = serde_json::from_str(&json)?;
         assert_eq!(wallet.scan_height, 436326);
-        assert_eq!(
-            wallet.spendable,
-            BigDecimal::from_str("78424071338002381489614636705")?
-        );
-        assert_eq!(
-            wallet.confirmed,
-            BigDecimal::from_str("78424071338002381489614636705")?
-        );
-        assert_eq!(wallet.unconfirmed, BigDecimal::from_str("0")?);
+        assert_eq!(wallet.spendable, 78424071338002381489614636705);
+        assert_eq!(wallet.confirmed, 78424071338002381489614636705);
+        assert_eq!(wallet.unconfirmed, 0);
         Ok(())
     }
 }

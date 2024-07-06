@@ -1,6 +1,5 @@
 use crate::Error::InvalidDataError;
 use crate::{ClientInner, Error, PublicKey};
-use bigdecimal::BigDecimal;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -45,8 +44,8 @@ pub struct AutopilotConfig {
 pub struct ContractConfig {
     pub set: String,
     pub amount: u64,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub allowance: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub allowance: u128,
     pub period: u64,
     pub renew_window: u64,
     pub download: u64,
@@ -69,7 +68,6 @@ pub struct HostConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     #[test]
     fn deserialize_list() -> anyhow::Result<()> {
@@ -108,12 +106,11 @@ mod tests {
 
         let autopilots: Vec<Autopilot> = serde_json::from_str(&json)?;
         assert_eq!(autopilots.len(), 1);
-
         let autopilot = autopilots.get(0).unwrap();
         assert_eq!(autopilot.id, "autopilot");
         assert_eq!(
             autopilot.config.contract_config.allowance,
-            BigDecimal::from_str("150000000000000000000000000000").unwrap()
+            150000000000000000000000000000
         );
 
         Ok(())

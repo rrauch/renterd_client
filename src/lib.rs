@@ -456,6 +456,40 @@ pub(crate) mod duration_ns {
     }
 }
 
+pub(crate) mod number_as_string {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_json::Number;
+    use std::fmt::Display;
+    use std::str::FromStr;
+
+    pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: AsRef<Number>,
+        S: Serializer,
+    {
+        Ok(serializer.serialize_str(v.as_ref().as_str())?)
+    }
+
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: FromStr + serde::Deserialize<'de>,
+        <T as FromStr>::Err: Display,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrInt<T> {
+            String(String),
+            Number(T),
+        }
+
+        match StringOrInt::<T>::deserialize(deserializer)? {
+            StringOrInt::String(s) => s.parse::<T>().map_err(serde::de::Error::custom),
+            StringOrInt::Number(i) => Ok(i),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct SettingsId([u8; 16]);
 
@@ -549,6 +583,9 @@ where
 
     deserializer.deserialize_option(StringVisitor)
 }
+
+#[derive(Deserialize)]
+pub(crate) struct U128Wrapper(#[serde(with = "crate::number_as_string")] u128);
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
-use bigdecimal::BigDecimal;
+use crate::{ClientInner, Error, U128Wrapper};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -14,13 +13,14 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn recommended_fee(&self) -> Result<BigDecimal, Error> {
-        Ok(serde_json::from_value(
+    pub async fn recommended_fee(&self) -> Result<u128, Error> {
+        let wrapper: U128Wrapper = serde_json::from_value(
             self.inner
                 .get_json("./bus/txpool/recommendedfee", None)
                 .await?,
         )
-        .map_err(|e| InvalidDataError(e.into()))?)
+        .map_err(|e| InvalidDataError(e.into()))?;
+        Ok(wrapper.0)
     }
 
     //todo: implement transactions
@@ -36,15 +36,14 @@ impl Api {
 
 #[cfg(test)]
 mod tests {
-    use bigdecimal::BigDecimal;
-    use std::str::FromStr;
+    use crate::U128Wrapper;
 
     #[test]
     fn deserialize_fee() -> anyhow::Result<()> {
         let json = r#"
         "30000000000000000000""#;
-        let fee: BigDecimal = serde_json::from_str(&json)?;
-        assert_eq!(fee, BigDecimal::from_str("30000000000000000000")?);
+        let fee: U128Wrapper = serde_json::from_str(&json)?;
+        assert_eq!(fee.0, 30000000000000000000);
         Ok(())
     }
 }

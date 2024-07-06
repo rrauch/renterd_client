@@ -51,83 +51,83 @@ pub struct PriceTable {
     #[serde(rename = "hostblockheight")]
     pub host_block_height: u64,
     #[serde(rename = "updatepricetablecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub update_price_table_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub update_price_table_cost: u128,
     #[serde(rename = "accountbalancecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub account_balance_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub account_balance_cost: u128,
     #[serde(rename = "fundaccountcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub fund_account_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub fund_account_cost: u128,
     #[serde(rename = "latestrevisioncost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub latest_revision_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub latest_revision_cost: u128,
     #[serde(rename = "subscriptionmemorycost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub subscription_memory_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub subscription_memory_cost: u128,
     #[serde(rename = "subscriptionnotificationcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub subscription_notification_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub subscription_notification_cost: u128,
     #[serde(rename = "initbasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub init_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub init_base_cost: u128,
     #[serde(rename = "memorytimecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub memory_time_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub memory_time_cost: u128,
     #[serde(rename = "downloadbandwidthcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub download_bandwidth_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub download_bandwidth_cost: u128,
     #[serde(rename = "uploadbandwidthcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub upload_bandwidth_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub upload_bandwidth_cost: u128,
     #[serde(rename = "dropsectorsbasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub drop_sector_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub drop_sector_base_cost: u128,
     #[serde(rename = "dropsectorsunitcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub drop_sector_unit_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub drop_sector_unit_cost: u128,
     #[serde(rename = "hassectorbasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub has_sector_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub has_sector_base_cost: u128,
     #[serde(rename = "readbasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub read_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub read_base_cost: u128,
     #[serde(rename = "readlengthcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub read_length_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub read_length_cost: u128,
     #[serde(rename = "renewcontractcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub renew_contract_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub renew_contract_cost: u128,
     #[serde(rename = "revisionbasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub revision_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub revision_base_cost: u128,
     #[serde(rename = "swapsectorcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub swap_sector_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub swap_sector_base_cost: u128,
     #[serde(rename = "writebasecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub write_base_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub write_base_cost: u128,
     #[serde(rename = "writelengthcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub write_length_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub write_length_cost: u128,
     #[serde(rename = "writestorecost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub write_store_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub write_store_cost: u128,
     #[serde(rename = "txnfeeminrecommended")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub txn_fee_min_recommended: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub txn_fee_min_recommended: u128,
     #[serde(rename = "txnfeemaxrecommended")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub txn_fee_max_recommended: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub txn_fee_max_recommended: u128,
     #[serde(rename = "contractprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub contract_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub contract_price: u128,
     #[serde(rename = "collateralcost")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub collateral_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub collateral_cost: u128,
     #[serde(rename = "maxcollateral")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub max_collateral: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub max_collateral: u128,
     #[serde(rename = "maxduration")]
     pub max_duration: u64, //todo: clarify if `Duration` can be used or if this is in blocks
     #[serde(rename = "windowsize")]
@@ -161,35 +161,35 @@ pub struct Settings {
     pub address: String, //todo
     #[serde(rename = "windowsize")]
     pub window_size: u64,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub collateral: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub collateral: u128,
     #[serde(rename = "maxcollateral")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub max_collateral: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub max_collateral: u128,
     #[serde(rename = "baserpcprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub base_rpc_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub base_rpc_price: u128,
     #[serde(rename = "contractprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub contract_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub contract_price: u128,
     #[serde(rename = "downloadbandwidthprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub download_bandwidth_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub download_bandwidth_price: u128,
     #[serde(rename = "sectoraccessprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub sector_access_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub sector_access_price: u128,
     #[serde(rename = "storageprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub storage_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub storage_price: u128,
     #[serde(rename = "uploadbandwidthprice")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub upload_bandwidth_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub upload_bandwidth_price: u128,
     #[serde(rename = "ephemeralaccountexpiry")]
     #[serde(with = "crate::duration_ns")]
     pub ephemeral_account_expiry: Duration,
     #[serde(rename = "maxephemeralaccountbalance")]
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub max_ephemeral_account_balance: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub max_ephemeral_account_balance: u128,
     #[serde(rename = "revisionnumber")]
     pub revision_number: u64,
     pub version: String,
@@ -277,7 +277,6 @@ pub struct UsabilityBreakDown {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     #[test]
     fn deserialize_list() -> anyhow::Result<()> {
@@ -757,10 +756,7 @@ mod tests {
             "e3a9371d148b0372b43b066e3841cbf1".try_into()?
         );
         assert_eq!(price_table.validity, Duration::from_nanos(600000000000));
-        assert_eq!(
-            price_table.upload_bandwidth_cost,
-            BigDecimal::from_str("200000000000000")?
-        );
+        assert_eq!(price_table.upload_bandwidth_cost, 200000000000000);
         assert_eq!(price_table.window_size, 144);
         assert_eq!(
             price_table.expiry,
@@ -769,7 +765,7 @@ mod tests {
 
         let settings = &hosts.get(2).unwrap().settings;
         assert_eq!(settings.accepting_contracts, true);
-        assert_eq!(settings.base_rpc_price, BigDecimal::from_str("0")?);
+        assert_eq!(settings.base_rpc_price, 0);
         assert_eq!(settings.window_size, 144);
         assert_eq!(
             settings.ephemeral_account_expiry,

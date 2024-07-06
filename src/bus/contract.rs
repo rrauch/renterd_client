@@ -1,6 +1,5 @@
 use crate::Error::InvalidDataError;
 use crate::{ClientInner, Error, FileContractId, PublicKey};
-use bigdecimal::BigDecimal;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -58,34 +57,33 @@ pub struct Contract {
     pub state: State,
     pub window_start: u64,
     pub window_end: u64,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub contract_price: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub contract_price: u128,
     pub renewed_from: FileContractId,
     pub spending: Spending,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub total_cost: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    pub total_cost: u128,
     pub contract_sets: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Spending {
-    #[serde(with = "bigdecimal::serde::json_num")]
-    uploads: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    downloads: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    fund_account: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    deletions: BigDecimal,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    sector_roots: BigDecimal,
+    #[serde(with = "crate::number_as_string")]
+    uploads: u128,
+    #[serde(with = "crate::number_as_string")]
+    downloads: u128,
+    #[serde(with = "crate::number_as_string")]
+    fund_account: u128,
+    #[serde(with = "crate::number_as_string")]
+    deletions: u128,
+    #[serde(with = "crate::number_as_string")]
+    sector_roots: u128,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     #[test]
     fn deserialize_list() -> anyhow::Result<()> {
@@ -225,7 +223,7 @@ mod tests {
 
         assert_eq!(
             contracts.get(0).unwrap().total_cost,
-            BigDecimal::from_str("14400000000000000000000000")?
+            14400000000000000000000000
         );
 
         assert_eq!(
@@ -242,16 +240,13 @@ mod tests {
 
         assert_eq!(
             contracts.get(0).unwrap().spending.uploads,
-            BigDecimal::from_str("529353231686279158451232")?
+            529353231686279158451232
         );
         assert_eq!(
             contracts.get(3).unwrap().spending.fund_account,
-            BigDecimal::from_str("1000000000000000000000001")?
+            1000000000000000000000001
         );
-        assert_eq!(
-            contracts.get(3).unwrap().spending.deletions,
-            BigDecimal::from_str("100")?
-        );
+        assert_eq!(contracts.get(3).unwrap().spending.deletions, 100);
 
         assert_eq!(contracts.get(1).unwrap().contract_sets.len(), 1);
         assert_eq!(contracts.get(3).unwrap().contract_sets.len(), 2);

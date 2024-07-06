@@ -96,7 +96,6 @@ pub mod contract_set {
 pub mod gouging {
     use crate::Error::InvalidDataError;
     use crate::{ClientInner, Error};
-    use bigdecimal::BigDecimal;
     use serde::Deserialize;
     use std::sync::Arc;
     use std::time::Duration;
@@ -123,30 +122,29 @@ pub mod gouging {
     #[serde(rename_all(deserialize = "camelCase"))]
     pub struct Settings {
         #[serde(rename = "maxRPCPrice")]
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub max_rpc_price: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub max_contract_price: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub max_download_price: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub max_upload_price: BigDecimal,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub max_storage_price: BigDecimal,
+        #[serde(with = "crate::number_as_string")]
+        pub max_rpc_price: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub max_contract_price: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub max_download_price: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub max_upload_price: u128,
+        #[serde(with = "crate::number_as_string")]
+        pub max_storage_price: u128,
         pub host_block_height_leeway: u32,
         #[serde(with = "crate::duration_ns")]
         pub min_price_table_validity: Duration,
         #[serde(with = "crate::duration_ns")]
         pub min_account_expiry: Duration,
-        #[serde(with = "bigdecimal::serde::json_num")]
-        pub min_max_ephemeral_account_balance: BigDecimal,
+        #[serde(with = "crate::number_as_string")]
+        pub min_max_ephemeral_account_balance: u128,
         pub migration_surcharge_multiplier: u64,
     }
 
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::str::FromStr;
 
         #[test]
         fn deserialize() -> anyhow::Result<()> {
@@ -168,18 +166,12 @@ pub mod gouging {
             let settings: Settings = serde_json::from_str(&json)?;
             assert_eq!(settings.host_block_height_leeway, 6);
             assert_eq!(settings.migration_surcharge_multiplier, 10);
-            assert_eq!(
-                settings.max_download_price,
-                BigDecimal::from_str("1000000000000000000000000000")?
-            );
+            assert_eq!(settings.max_download_price, 1000000000000000000000000000);
             assert_eq!(
                 settings.min_max_ephemeral_account_balance,
-                BigDecimal::from_str("1000000000000000000000000")?
+                1000000000000000000000000
             );
-            assert_eq!(
-                settings.max_storage_price,
-                BigDecimal::from_str("69444444444")?
-            );
+            assert_eq!(settings.max_storage_price, 69444444444);
             assert_eq!(
                 settings.min_account_expiry,
                 Duration::from_nanos(86400000000000),
