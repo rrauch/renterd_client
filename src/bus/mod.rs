@@ -10,6 +10,7 @@ pub mod object;
 pub mod setting;
 pub mod state;
 mod stats;
+mod syncer;
 
 use crate::bus::account::Api as AccountApi;
 use crate::bus::alert::Api as AlertApi;
@@ -23,6 +24,7 @@ use crate::bus::object::Api as ObjectApi;
 use crate::bus::setting::Api as SettingApi;
 use crate::bus::state::Api as StateApi;
 use crate::bus::stats::Api as StatsApi;
+use crate::bus::syncer::Api as SyncerApi;
 use crate::ClientInner;
 use std::sync::Arc;
 
@@ -40,6 +42,7 @@ pub struct Bus {
     setting: SettingApi,
     state: StateApi,
     stats: StatsApi,
+    syncer: SyncerApi,
 }
 
 impl Bus {
@@ -57,6 +60,7 @@ impl Bus {
             setting: SettingApi::new(inner.clone()),
             state: StateApi::new(inner.clone()),
             stats: StatsApi::new(inner.clone()),
+            syncer: SyncerApi::new(inner.clone()),
         }
     }
 
@@ -106,5 +110,9 @@ impl Bus {
 
     pub fn stats(&self) -> &StatsApi {
         &self.stats
+    }
+
+    pub fn syncer(&self) -> &SyncerApi {
+        &self.syncer
     }
 }
