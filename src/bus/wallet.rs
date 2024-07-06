@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ClientInner, Error, Hash};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -19,6 +19,13 @@ impl Api {
                 .map_err(|e| InvalidDataError(e.into()))?,
         )
     }
+
+    pub async fn outputs(&self) -> Result<Vec<Output>, Error> {
+        Ok(
+            serde_json::from_value(self.inner.get_json("./bus/wallet/outputs", None).await?)
+                .map_err(|e| InvalidDataError(e.into()))?,
+        )
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -34,9 +41,19 @@ pub struct Wallet {
     pub unconfirmed: u128,
 }
 
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all(deserialize = "camelCase"))]
+pub struct Output {
+    #[serde(with = "crate::number_as_string")]
+    pub value: u128,
+    pub address: String, //todo
+    pub id: Hash,
+    pub maturity_height: u64,
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::bus::wallet::Wallet;
+    use super::*;
 
     #[test]
     fn deserialize_wallet() -> anyhow::Result<()> {
@@ -54,6 +71,43 @@ mod tests {
         assert_eq!(wallet.spendable, 78424071338002381489614636705);
         assert_eq!(wallet.confirmed, 78424071338002381489614636705);
         assert_eq!(wallet.unconfirmed, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn deserialize_outputs() -> anyhow::Result<()> {
+        let json = r#"
+        [
+  {
+    "value": "130303561734677732679493600",
+    "address": "addr:9e5c7ee27eae74e278e7470d44163b08db21d8137ed04e476b742cd76f0b6deb1c7f6f10dcfe",
+    "id": "h:59d605fd783cfd4d0511f00d9e569cf71d416e68cb4f17424d85995c4c7674ab",
+    "maturityHeight": 1122
+  },
+  {
+    "value": "6840004092910992448143033193",
+    "address": "addr:9e5c7ee27eae74e278e7470d44163b08db21d8137ed04e476b742cd76f0b6deb1c7f6f10dcfe",
+    "id": "h:9918606661349b56fcb75786f719563dbc4170594bbe56b9c557b60c2d5776e1",
+    "maturityHeight": 11223
+  },
+  {
+    "value": "437078594556495665233100000",
+    "address": "addr:9e5c7ee27eae74e278e7470d44163b08db21d8137ed04e476b742cd76f0b6deb1c7f6f10dcfe",
+    "id": "h:d1e61b964297ab9e45c4829d42de0712b96d67d265024141851f4c7b94f3d6ee",
+    "maturityHeight": 112233
+  }
+]
+        "#;
+        let outputs: Vec<Output> = serde_json::from_str(&json)?;
+        assert_eq!(outputs.len(), 3);
+        assert_eq!(outputs.get(0).unwrap().value, 130303561734677732679493600);
+        assert_eq!(outputs.get(0).unwrap().maturity_height, 1122);
+        assert_eq!(
+            outputs.get(1).unwrap().id,
+            "h:9918606661349b56fcb75786f719563dbc4170594bbe56b9c557b60c2d5776e1".try_into()?
+        );
+        //todo: address
+
         Ok(())
     }
 }
