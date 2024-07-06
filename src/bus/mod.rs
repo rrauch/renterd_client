@@ -9,9 +9,10 @@ pub mod metrics;
 pub mod object;
 pub mod setting;
 pub mod state;
-mod stats;
-mod syncer;
-mod txpool;
+pub mod stats;
+pub mod syncer;
+pub mod txpool;
+pub mod wallet;
 
 use crate::bus::account::Api as AccountApi;
 use crate::bus::alert::Api as AlertApi;
@@ -27,6 +28,7 @@ use crate::bus::state::Api as StateApi;
 use crate::bus::stats::Api as StatsApi;
 use crate::bus::syncer::Api as SyncerApi;
 use crate::bus::txpool::Api as TxpoolApi;
+use crate::bus::wallet::Api as WalletApi;
 use crate::ClientInner;
 use std::sync::Arc;
 
@@ -46,6 +48,7 @@ pub struct Bus {
     stats: StatsApi,
     syncer: SyncerApi,
     txpool: TxpoolApi,
+    wallet: WalletApi,
 }
 
 impl Bus {
@@ -65,6 +68,7 @@ impl Bus {
             stats: StatsApi::new(inner.clone()),
             syncer: SyncerApi::new(inner.clone()),
             txpool: TxpoolApi::new(inner.clone()),
+            wallet: WalletApi::new(inner.clone()),
         }
     }
 
@@ -122,5 +126,9 @@ impl Bus {
 
     pub fn txpool(&self) -> &TxpoolApi {
         &self.txpool
+    }
+
+    pub fn wallet(&self) -> &WalletApi {
+        &self.wallet
     }
 }

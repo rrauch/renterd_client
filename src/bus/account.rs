@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{Address, ClientInner, Error, PublicKey};
+use crate::{ClientInner, Error, PublicKey};
 use bigdecimal::BigDecimal;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -25,7 +25,7 @@ impl Api {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct Account {
-    pub id: Address,
+    pub id: PublicKey,
     pub clean_shutdown: bool,
     pub host_key: PublicKey,
     #[serde(with = "bigdecimal::serde::json_num")]

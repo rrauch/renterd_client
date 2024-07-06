@@ -231,8 +231,6 @@ pub enum PublicKey {
     Ed25519([u8; 32]),
 }
 
-pub type Address = PublicKey;
-
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
