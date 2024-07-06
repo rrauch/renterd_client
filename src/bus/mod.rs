@@ -13,6 +13,7 @@ pub mod stats;
 pub mod syncer;
 pub mod txpool;
 pub mod wallet;
+pub mod webhook;
 
 use crate::bus::account::Api as AccountApi;
 use crate::bus::alert::Api as AlertApi;
@@ -29,6 +30,7 @@ use crate::bus::stats::Api as StatsApi;
 use crate::bus::syncer::Api as SyncerApi;
 use crate::bus::txpool::Api as TxpoolApi;
 use crate::bus::wallet::Api as WalletApi;
+use crate::bus::webhook::Api as WebhookApi;
 use crate::ClientInner;
 use std::sync::Arc;
 
@@ -49,6 +51,7 @@ pub struct Bus {
     syncer: SyncerApi,
     txpool: TxpoolApi,
     wallet: WalletApi,
+    webhook: WebhookApi,
 }
 
 impl Bus {
@@ -69,6 +72,7 @@ impl Bus {
             syncer: SyncerApi::new(inner.clone()),
             txpool: TxpoolApi::new(inner.clone()),
             wallet: WalletApi::new(inner.clone()),
+            webhook: WebhookApi::new(inner.clone()),
         }
     }
 
@@ -130,5 +134,9 @@ impl Bus {
 
     pub fn wallet(&self) -> &WalletApi {
         &self.wallet
+    }
+
+    pub fn webhook(&self) -> &WebhookApi {
+        &self.webhook
     }
 }
