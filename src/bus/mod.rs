@@ -8,6 +8,7 @@ pub mod host;
 pub mod metrics;
 pub mod object;
 pub mod setting;
+pub mod state;
 
 use crate::bus::account::Api as AccountApi;
 use crate::bus::alert::Api as AlertApi;
@@ -19,6 +20,7 @@ use crate::bus::host::Api as HostApi;
 use crate::bus::metrics::Api as MetricsApi;
 use crate::bus::object::Api as ObjectApi;
 use crate::bus::setting::Api as SettingApi;
+use crate::bus::state::Api as StateApi;
 use crate::ClientInner;
 use std::sync::Arc;
 
@@ -34,6 +36,7 @@ pub struct Bus {
     metrics: MetricsApi,
     object: ObjectApi,
     setting: SettingApi,
+    state: StateApi,
 }
 
 impl Bus {
@@ -49,6 +52,7 @@ impl Bus {
             metrics: MetricsApi::new(inner.clone()),
             object: ObjectApi::new(inner.clone()),
             setting: SettingApi::new(inner.clone()),
+            state: StateApi::new(inner.clone()),
         }
     }
 
@@ -90,5 +94,9 @@ impl Bus {
 
     pub fn setting(&self) -> &SettingApi {
         &self.setting
+    }
+
+    pub fn state(&self) -> &StateApi {
+        &self.state
     }
 }
