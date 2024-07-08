@@ -1,3 +1,4 @@
+use crate::autopilot::Autopilot;
 use crate::bus::Bus;
 use reqwest::{Client as ReqwestClient, Response};
 use serde::de::Visitor;
@@ -17,11 +18,16 @@ pub mod worker;
 #[derive(Clone)]
 pub struct Client {
     bus: Bus,
+    autopilot: Autopilot,
 }
 
 impl Client {
     pub fn bus(&self) -> &Bus {
         &self.bus
+    }
+
+    pub fn autopilot(&self) -> &Autopilot {
+        &self.autopilot
     }
 }
 
@@ -222,6 +228,7 @@ impl ClientBuilder {
 
         Ok(Client {
             bus: Bus::new(inner.clone()),
+            autopilot: Autopilot::new(inner.clone()),
         })
     }
 }

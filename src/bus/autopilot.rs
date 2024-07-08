@@ -1,7 +1,7 @@
+use crate::autopilot::config::AutopilotConfig;
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, PublicKey};
+use crate::{ClientInner, Error};
 use serde::Deserialize;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -28,41 +28,6 @@ pub struct Autopilot {
     pub id: String,
     pub config: AutopilotConfig,
     pub current_period: u64,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
-pub struct AutopilotConfig {
-    #[serde(rename = "contracts")]
-    pub contract_config: ContractConfig,
-    #[serde(rename = "hosts")]
-    pub host_config: HostConfig,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
-pub struct ContractConfig {
-    pub set: String,
-    pub amount: u64,
-    #[serde(with = "crate::number_as_string")]
-    pub allowance: u128,
-    pub period: u64,
-    pub renew_window: u64,
-    pub download: u64,
-    pub upload: u64,
-    pub storage: u64,
-    pub prune: bool,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
-pub struct HostConfig {
-    #[serde(rename = "allowRedundantIPs")]
-    pub allow_redundant_ips: bool,
-    pub max_downtime_hours: u64,
-    pub min_protocol_version: String,
-    pub min_recent_scan_failures: u64,
-    pub score_overrides: Option<BTreeMap<PublicKey, f64>>,
 }
 
 #[cfg(test)]
