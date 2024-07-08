@@ -1,5 +1,6 @@
 use crate::autopilot::Autopilot;
 use crate::bus::Bus;
+use crate::worker::Worker;
 use chrono::{DateTime, FixedOffset};
 use reqwest::{Client as ReqwestClient, Response};
 use serde::de::Visitor;
@@ -20,6 +21,7 @@ pub mod worker;
 pub struct Client {
     bus: Bus,
     autopilot: Autopilot,
+    worker: Worker,
 }
 
 impl Client {
@@ -29,6 +31,10 @@ impl Client {
 
     pub fn autopilot(&self) -> &Autopilot {
         &self.autopilot
+    }
+
+    pub fn worker(&self) -> &Worker {
+        &self.worker
     }
 }
 
@@ -230,6 +236,7 @@ impl ClientBuilder {
         Ok(Client {
             bus: Bus::new(inner.clone()),
             autopilot: Autopilot::new(inner.clone()),
+            worker: Worker::new(inner),
         })
     }
 }

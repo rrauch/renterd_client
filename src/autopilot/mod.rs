@@ -1,5 +1,5 @@
 pub mod config;
-mod state;
+pub mod state;
 
 use crate::autopilot::config::Api as ConfigApi;
 use crate::autopilot::state::Api as StateApi;
@@ -22,5 +22,9 @@ impl Autopilot {
 
     pub fn config(&self) -> &ConfigApi {
         &self.config
+    }
+
+    pub fn state(&self) -> &StateApi {
+        &self.state
     }
 }
