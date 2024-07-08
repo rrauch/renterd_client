@@ -1,13 +1,16 @@
 use crate::autopilot::Autopilot;
 use crate::bus::Bus;
 use crate::worker::Worker;
+use bandwidth::Bandwidth;
+use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, FixedOffset};
 use reqwest::{Client as ReqwestClient, Response};
-use serde::de::Visitor;
+use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use url::Url;
@@ -147,6 +150,8 @@ pub enum InvalidDataError {
     UnsupportedFileContractId(String),
     #[error("invalid settings id {0}")]
     InvalidSettingsId(String),
+    #[error("invalid percentage {0}")]
+    InvalidPercentage(String),
 }
 
 pub struct ClientBuilder {
@@ -653,12 +658,139 @@ where
     deserializer.deserialize_option(StringVisitor)
 }
 
+fn deserialize_mbps_float<'de, D>(deserializer: D) -> Result<Bandwidth, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BandwidthVisitor;
+
+    fn to_bandwidth(mbps: f64) -> Bandwidth {
+        let gbps = mbps / 1_000.0;
+        let full_gbps = gbps.trunc() as u64;
+        let remaining_bps = ((mbps - (full_gbps as f64 * 1_000.0)) * 1_000_000.0) as u32;
+        Bandwidth::new(full_gbps, remaining_bps)
+    }
+
+    impl<'de> Visitor<'de> for BandwidthVisitor {
+        type Value = Bandwidth;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a number")
+        }
+
+        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(to_bandwidth(v))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(to_bandwidth(v as f64))
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            //let value = map.next_value::<Number>()?;
+            match map.next_value::<String>()?.parse::<f64>() {
+                Ok(v) => Ok(to_bandwidth(v)),
+                Err(_) => Err(serde::de::Error::custom("Invalid number")),
+            }
+        }
+    }
+
+    deserializer.deserialize_any(BandwidthVisitor)
+}
+
 #[derive(Deserialize)]
 pub(crate) struct U128Wrapper(#[serde(with = "crate::number_as_string")] u128);
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Percentage {
+    inner: BigDecimal,
+}
+
+impl Percentage {
+    fn new(value: BigDecimal) -> Self {
+        Self { inner: value / 100 }
+    }
+
+    pub fn as_big_decimal(&self) -> &BigDecimal {
+        &self.inner
+    }
+}
+
+impl TryFrom<&str> for Percentage {
+    type Error = InvalidDataError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Percentage::new(BigDecimal::from_str(value).map_err(
+            |_| InvalidDataError::InvalidPercentage(value.to_string()),
+        )?))
+    }
+}
+
+impl<'de> Deserialize<'de> for Percentage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(PercentageVisitor)
+    }
+}
+
+struct PercentageVisitor;
+
+impl<'de> Visitor<'de> for PercentageVisitor {
+    type Value = Percentage;
+
+    fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+        formatter.write_str("a number")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v.try_into().map_err(|e| serde::de::Error::custom(e))?)
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Percentage::new(BigDecimal::from(v)))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Percentage::new(
+            BigDecimal::from_f64(v).ok_or(serde::de::Error::custom("failed to parse f64"))?,
+        ))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        match BigDecimal::from_str(map.next_value::<String>()?.as_str()) {
+            Ok(bd) => Ok(Percentage::new(bd)),
+            Err(_) => Err(serde::de::Error::custom("Invalid number")),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bigdecimal::Zero;
 
     #[test]
     fn public_key_handling() -> anyhow::Result<()> {
@@ -740,6 +872,57 @@ mod tests {
             _ => panic!("invalid settings error expected"),
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn bandwidth_deserialization() -> anyhow::Result<()> {
+        #[derive(Deserialize)]
+        struct Test {
+            #[serde(deserialize_with = "crate::deserialize_mbps_float")]
+            bw: Bandwidth,
+        }
+        let json_int_zero = r#"{ "bw": 0 }"#;
+        let test: Test = serde_json::from_str(json_int_zero)?;
+        assert_eq!(test.bw, Bandwidth::from_mbps(0));
+
+        let json_float_zero = r#"{ "bw": 0.0 }"#;
+        let test: Test = serde_json::from_str(json_float_zero)?;
+        assert_eq!(test.bw, Bandwidth::from_mbps(0));
+
+        let json_int_1 = r#"{ "bw": 1 }"#;
+        let test: Test = serde_json::from_str(json_int_1)?;
+        assert_eq!(test.bw, Bandwidth::from_mbps(1));
+
+        let json_float = r#"{ "bw": 1000.1 }"#;
+        let test: Test = serde_json::from_str(json_float)?;
+        assert_eq!(test.bw, Bandwidth::new(1, 100000));
+
+        Ok(())
+    }
+
+    #[test]
+    fn percentage_deserialization() -> anyhow::Result<()> {
+        #[derive(Deserialize)]
+        struct Test {
+            p1: Percentage,
+            p2: Percentage,
+            p3: Percentage,
+            p4: Percentage,
+        }
+
+        let json = r#"{
+         "p1": 0,
+         "p2": 2,
+         "p3": 123,
+         "p4": 10.25
+        }
+        "#;
+        let test: Test = serde_json::from_str(&json)?;
+        assert!(test.p1.as_big_decimal().is_zero());
+        assert_eq!(test.p2.as_big_decimal(), &BigDecimal::from_str("0.02")?);
+        assert_eq!(test.p3.as_big_decimal(), &BigDecimal::from_str("1.23")?);
+        assert_eq!(test.p4.as_big_decimal(), &BigDecimal::from_str("0.1025")?);
         Ok(())
     }
 }

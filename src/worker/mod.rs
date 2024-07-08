@@ -1,8 +1,10 @@
 pub mod memory;
-mod state;
+pub mod state;
+pub mod stats;
 
 use crate::worker::memory::Api as MemoryApi;
 use crate::worker::state::Api as StateApi;
+use crate::worker::stats::Api as StatsApi;
 use crate::Error::InvalidDataError;
 use crate::{ClientInner, Error};
 use std::sync::Arc;
@@ -12,6 +14,7 @@ pub struct Worker {
     inner: Arc<ClientInner>,
     memory: MemoryApi,
     state: StateApi,
+    stats: StatsApi,
 }
 
 impl Worker {
@@ -20,6 +23,7 @@ impl Worker {
             inner: inner.clone(),
             memory: MemoryApi::new(inner.clone()),
             state: StateApi::new(inner.clone()),
+            stats: StatsApi::new(inner.clone()),
         }
     }
 
@@ -36,5 +40,9 @@ impl Worker {
 
     pub fn state(&self) -> &StateApi {
         &self.state
+    }
+
+    pub fn stats(&self) -> &StatsApi {
+        &self.stats
     }
 }
