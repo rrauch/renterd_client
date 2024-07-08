@@ -1,6 +1,6 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
-use chrono::{DateTime, FixedOffset};
+use crate::{ClientInner, Error, State as CommonState};
+use chrono::DateTime;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -25,12 +25,8 @@ impl Api {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "camelCase"))]
 pub struct State {
-    pub start_time: DateTime<FixedOffset>,
-    pub network: String,
-    pub version: String,
-    pub commit: String,
-    pub os: String,
-    pub build_time: DateTime<FixedOffset>,
+    #[serde(flatten)]
+    pub common: CommonState,
 }
 
 #[cfg(test)]
@@ -51,14 +47,14 @@ mod tests {
         "#;
         let state: State = serde_json::from_str(&json)?;
         assert_eq!(
-            state.start_time,
+            state.common.start_time,
             DateTime::parse_from_rfc3339("2023-09-22T19:08:16.677593561Z")?
         );
-        assert_eq!(state.network, "Mainnet");
-        assert_eq!(state.version, "7fb1758");
-        assert_eq!(state.os, "linux");
+        assert_eq!(state.common.network, "Mainnet");
+        assert_eq!(state.common.version, "7fb1758");
+        assert_eq!(state.common.os, "linux");
         assert_eq!(
-            state.build_time,
+            state.common.build_time,
             DateTime::parse_from_rfc3339("2023-09-22T13:50:06Z")?
         );
 

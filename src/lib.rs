@@ -1,5 +1,6 @@
 use crate::autopilot::Autopilot;
 use crate::bus::Bus;
+use chrono::{DateTime, FixedOffset};
 use reqwest::{Client as ReqwestClient, Response};
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
@@ -233,6 +234,17 @@ impl ClientBuilder {
     }
 }
 
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all(deserialize = "camelCase"))]
+pub struct State {
+    pub start_time: DateTime<FixedOffset>,
+    pub network: String,
+    pub version: String,
+    pub commit: String,
+    pub os: String,
+    pub build_time: DateTime<FixedOffset>,
+}
+
 #[derive(PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub enum PublicKey {
     Ed25519([u8; 32]),
@@ -458,7 +470,50 @@ pub(crate) mod duration_ns {
         where
             E: serde::de::Error,
         {
-            Ok(std::time::Duration::from_nanos(v))
+            Ok(Duration::from_nanos(v))
+        }
+    }
+}
+
+pub(crate) mod duration_ms {
+    use bigdecimal::ToPrimitive;
+    use serde::de::Visitor;
+    use serde::{Deserializer, Serializer};
+    use std::fmt::Formatter;
+    use std::time::Duration;
+
+    pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: AsRef<Duration>,
+        S: Serializer,
+    {
+        Ok(
+            serializer.serialize_u64(v.as_ref().as_millis().to_u64().ok_or(
+                serde::ser::Error::custom("milliseconds cannot be represented as u64"),
+            )?)?,
+        )
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_u64(DurationVisitor)
+    }
+
+    struct DurationVisitor;
+    impl<'de> Visitor<'de> for DurationVisitor {
+        type Value = Duration;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("a millisecond number")
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(Duration::from_millis(v))
         }
     }
 }
