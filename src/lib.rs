@@ -6,7 +6,7 @@ use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, FixedOffset};
 use reqwest::{Client as ReqwestClient, Response};
 use serde::de::{MapAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -55,6 +55,11 @@ impl Drop for ClientInner {
 
 enum RequestType<'a> {
     Get(Option<Vec<(&'a str, String)>>),
+    Post(Option<PostContent>, Option<Vec<(&'a str, String)>>),
+}
+
+enum PostContent {
+    Json(Value),
 }
 
 impl ClientInner {
@@ -87,6 +92,18 @@ impl ClientInner {
         let request_builder = match request {
             RequestType::Get(params) => {
                 let mut r = self.reqwest_client.get(url);
+                if let Some(params) = params {
+                    r = r.query(params);
+                }
+                r
+            }
+            RequestType::Post(content, params) => {
+                let mut r = self.reqwest_client.post(url);
+                if let Some(content) = content {
+                    match content {
+                        PostContent::Json(json) => r = r.json(json),
+                    }
+                }
                 if let Some(params) = params {
                     r = r.query(params);
                 }
@@ -158,6 +175,7 @@ pub struct ClientBuilder {
     api_endpoint_url: Option<String>,
     api_password: Option<String>,
     accept_invalid_certs: bool,
+    verbose_logging: bool,
 }
 
 impl Drop for ClientBuilder {
@@ -180,6 +198,7 @@ impl ClientBuilder {
             api_endpoint_url: None,
             api_password: None,
             accept_invalid_certs: false,
+            verbose_logging: false,
         }
     }
 
@@ -195,6 +214,11 @@ impl ClientBuilder {
 
     pub fn danger_accept_invalid_certs(mut self, accept_invalid_certs: bool) -> Self {
         self.accept_invalid_certs = accept_invalid_certs;
+        self
+    }
+
+    pub fn verbose_logging(mut self, enable_verbose_logging: bool) -> Self {
+        self.verbose_logging = enable_verbose_logging;
         self
     }
 
@@ -229,6 +253,7 @@ impl ClientBuilder {
 
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(self.accept_invalid_certs)
+            .connection_verbose(self.verbose_logging)
             .build()
             .map_err(|e| ClientBuilderError::ReqwestError(e))?;
 
@@ -361,6 +386,15 @@ impl<'de> Deserialize<'de> for Hash {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_str(HashVisitor)
+    }
+}
+
+impl Serialize for Hash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 

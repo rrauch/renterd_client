@@ -1,7 +1,7 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, Hash};
+use crate::{ClientInner, Error, Hash, PostContent, RequestType};
 use chrono::{DateTime, FixedOffset};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
@@ -34,10 +34,52 @@ impl Api {
 
         Ok((response.alerts.unwrap_or(vec![]), response.has_more))
     }
+
+    pub async fn dismiss(&self, alert_ids: Option<Vec<&Hash>>) -> Result<(), Error> {
+        let req = dismiss_req(alert_ids)?;
+        let _ = self
+            .inner
+            .send_api_request("./bus/alerts/dismiss", &req)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn register(&self, alert: &Alert) -> Result<(), Error> {
+        let req = register_req(alert)?;
+        let _ = self
+            .inner
+            .send_api_request("./bus/alerts/register", &req)
+            .await?;
+        Ok(())
+    }
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all(deserialize = "camelCase"))]
+fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Error> {
+    let (post_content, params) = match alert_ids.filter(|h| !h.is_empty()) {
+        Some(hashes) => (
+            Some(PostContent::Json(
+                serde_json::to_value(hashes).map_err(|e| InvalidDataError(e.into()))?,
+            )),
+            None,
+        ),
+        None => {
+            (None, Some(vec![("all", "true".to_string())]))
+        },
+    };
+    Ok(RequestType::Post(post_content, params))
+}
+
+fn register_req(alert: &Alert) -> Result<RequestType<'static>, Error> {
+    Ok(RequestType::Post(
+        Some(PostContent::Json(
+            serde_json::to_value(alert).map_err(|e| InvalidDataError(e.into()))?,
+        )),
+        None,
+    ))
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum Severity {
     Info,
     Warning,
@@ -45,8 +87,8 @@ pub enum Severity {
     Critical,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Alert {
     pub id: Hash,
     pub severity: Severity,
@@ -56,7 +98,7 @@ pub struct Alert {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[serde(rename_all = "camelCase")]
 struct ListResponse {
     alerts: Option<Vec<Alert>>,
     has_more: bool,
@@ -205,6 +247,102 @@ mod tests {
 
         let alerts_response: ListResponse = serde_json::from_str(&json)?;
         assert!(alerts_response.alerts.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_dismiss() -> anyhow::Result<()> {
+        let json = r#"
+        [
+    "h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b"
+]
+        "#;
+        let expected: Value = serde_json::from_str(&json)?;
+
+        match dismiss_req(Some(vec![
+            &"h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b".try_into()?,
+        ]))? {
+            RequestType::Post(Some(PostContent::Json(json)), None) => {
+                assert_eq!(json, expected)
+            }
+            _ => panic!("invalid request"),
+        }
+
+        match dismiss_req(None)? {
+            RequestType::Post(None, Some(params)) => {
+                assert_eq!(params, vec![("all", "true".to_string())])
+            }
+            _ => panic!("invalid request"),
+        }
+
+        match dismiss_req(Some(vec![]))? {
+            RequestType::Post(None, Some(params)) => {
+                assert_eq!(params, vec![("all", "true".to_string())])
+            }
+            _ => panic!("invalid request"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_register() -> anyhow::Result<()> {
+        let json = r#"
+        {
+        "id": "h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b",
+        "severity": "error",
+        "message": "failed to refill account: couldn't fund account: unable to fetch revision with contract: LatestRevision: DialStream: could not dial transport: dial tcp 47.201.106.209:9983: connect: no route to host (3.100356859s)\n",
+        "data": {
+            "accountID": "ed25519:a82e28057ddac68ae2677709635146ca6bac788fa927d18e750bb3a95be17931",
+            "contractID": "fcid:890f1d21493fd478eef18e79572560d2297e52dba3740584f7104ffb4bfbb13d",
+            "hostKey": "ed25519:a71661d9f854a4d6f93e9b120f07efc75facfd9bd2cb26de4c3559b74316eb75",
+            "origin": "autopilot.autopilot"
+        },
+        "timestamp": "2023-08-30T12:20:49.611086295Z"
+    }
+        "#;
+        let expected: Value = serde_json::from_str(&json)?;
+
+        let mut data = BTreeMap::new();
+        data.insert(
+            "accountID".to_string(),
+            Value::String(
+                "ed25519:a82e28057ddac68ae2677709635146ca6bac788fa927d18e750bb3a95be17931"
+                    .to_string(),
+            ),
+        );
+        data.insert(
+            "contractID".to_string(),
+            Value::String(
+                "fcid:890f1d21493fd478eef18e79572560d2297e52dba3740584f7104ffb4bfbb13d".to_string(),
+            ),
+        );
+        data.insert(
+            "hostKey".to_string(),
+            Value::String(
+                "ed25519:a71661d9f854a4d6f93e9b120f07efc75facfd9bd2cb26de4c3559b74316eb75"
+                    .to_string(),
+            ),
+        );
+        data.insert(
+            "origin".to_string(),
+            Value::String("autopilot.autopilot".to_string()),
+        );
+        let alert = Alert {
+            id: "h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b".try_into()?,
+            severity: Severity::Error,
+            message: "failed to refill account: couldn't fund account: unable to fetch revision with contract: LatestRevision: DialStream: could not dial transport: dial tcp 47.201.106.209:9983: connect: no route to host (3.100356859s)\n".to_string(),
+            timestamp: DateTime::parse_from_rfc3339("2023-08-30T12:20:49.611086295Z").unwrap(),
+            data: Some(data)
+        };
+
+        match register_req(&alert)? {
+            RequestType::Post(Some(PostContent::Json(json)), None) => {
+                assert_eq!(json, expected);
+            }
+            _ => panic!("invalid request"),
+        }
 
         Ok(())
     }
