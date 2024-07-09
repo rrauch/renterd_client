@@ -55,10 +55,11 @@ impl Drop for ClientInner {
 
 enum RequestType<'a> {
     Get(Option<Vec<(&'a str, String)>>),
-    Post(Option<PostContent>, Option<Vec<(&'a str, String)>>),
+    Post(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
+    Put(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
 }
 
-enum PostContent {
+enum RequestContent {
     Json(Value),
 }
 
@@ -101,7 +102,19 @@ impl ClientInner {
                 let mut r = self.reqwest_client.post(url);
                 if let Some(content) = content {
                     match content {
-                        PostContent::Json(json) => r = r.json(json),
+                        RequestContent::Json(json) => r = r.json(json),
+                    }
+                }
+                if let Some(params) = params {
+                    r = r.query(params);
+                }
+                r
+            }
+            RequestType::Put(content, params) => {
+                let mut r = self.reqwest_client.put(url);
+                if let Some(content) = content {
+                    match content {
+                        RequestContent::Json(json) => r = r.json(json),
                     }
                 }
                 if let Some(params) = params {
@@ -573,16 +586,15 @@ pub(crate) mod duration_ms {
 
 pub(crate) mod number_as_string {
     use serde::{Deserialize, Deserializer, Serializer};
-    use serde_json::Number;
     use std::fmt::Display;
     use std::str::FromStr;
 
     pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
-        T: AsRef<Number>,
+        T: ToString,
         S: Serializer,
     {
-        Ok(serializer.serialize_str(v.as_ref().as_str())?)
+        Ok(serializer.serialize_str(v.to_string().as_str())?)
     }
 
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>

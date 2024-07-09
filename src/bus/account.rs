@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, PostContent, PublicKey, RequestType};
+use crate::{ClientInner, Error, RequestContent, PublicKey, RequestType};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -109,7 +109,7 @@ impl Api {
 
 fn add_req(host_key: &PublicKey) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(AddRequest { host_key })
                 .map_err(|e| InvalidDataError(e.into()))?,
         )),
@@ -125,7 +125,7 @@ struct AddRequest<'a> {
 
 fn update_balance_req(host_key: &PublicKey, amount: u128) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(UpdateBalanceRequest { host_key, amount })
                 .map_err(|e| InvalidDataError(e.into()))?,
         )),
@@ -142,7 +142,7 @@ struct UpdateBalanceRequest<'a> {
 
 fn add_balance_req(host_key: &PublicKey, amount: u128) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(AddBalanceRequest { host_key, amount })
                 .map_err(|e| InvalidDataError(e.into()))?,
         )),
@@ -159,7 +159,7 @@ struct AddBalanceRequest<'a> {
 
 fn requires_sync_req(host_key: &PublicKey) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(RequiresSyncRequest { host_key })
                 .map_err(|e| InvalidDataError(e.into()))?,
         )),
@@ -179,7 +179,7 @@ fn lock_req(
     duration: Duration,
 ) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(LockRequest {
                 host_key,
                 exclusive,
@@ -210,7 +210,7 @@ struct LockResponse {
 
 fn unlock_req(lock_id: u64) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(UnlockRequest { lock_id })
                 .map_err(|e| InvalidDataError(e.into()))?,
         )),
@@ -320,7 +320,7 @@ mod tests {
             false,
             Duration::from_millis(1000),
         )? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -371,7 +371,7 @@ mod tests {
         let expected: Value = serde_json::from_str(&json)?;
 
         match unlock_req(13874228167312385374)? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -393,7 +393,7 @@ mod tests {
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
         match requires_sync_req(&host_key)? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -415,7 +415,7 @@ mod tests {
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
         match add_balance_req(&host_key, 1000000)? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -437,7 +437,7 @@ mod tests {
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
         match update_balance_req(&host_key, 22221111)? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -459,7 +459,7 @@ mod tests {
             &"ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?,
         )? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),

@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, Hash, PostContent, RequestType};
+use crate::{ClientInner, Error, Hash, RequestContent, RequestType};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -57,7 +57,7 @@ impl Api {
 fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Error> {
     let (post_content, params) = match alert_ids.filter(|h| !h.is_empty()) {
         Some(hashes) => (
-            Some(PostContent::Json(
+            Some(RequestContent::Json(
                 serde_json::to_value(hashes).map_err(|e| InvalidDataError(e.into()))?,
             )),
             None,
@@ -69,7 +69,7 @@ fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Er
 
 fn register_req(alert: &Alert) -> Result<RequestType<'static>, Error> {
     Ok(RequestType::Post(
-        Some(PostContent::Json(
+        Some(RequestContent::Json(
             serde_json::to_value(alert).map_err(|e| InvalidDataError(e.into()))?,
         )),
         None,
@@ -261,7 +261,7 @@ mod tests {
         match dismiss_req(Some(vec![
             &"h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b".try_into()?,
         ]))? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected)
             }
             _ => panic!("invalid request"),
@@ -336,7 +336,7 @@ mod tests {
         };
 
         match register_req(&alert)? {
-            RequestType::Post(Some(PostContent::Json(json)), None) => {
+            RequestType::Post(Some(RequestContent::Json(json)), None) => {
                 assert_eq!(json, expected);
             }
             _ => panic!("invalid request"),

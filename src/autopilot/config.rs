@@ -1,6 +1,6 @@
 use crate::Error::InvalidDataError;
 use crate::{ClientInner, Error, PublicKey};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -22,8 +22,8 @@ impl Api {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AutopilotConfig {
     #[serde(rename = "contracts")]
     pub contract_config: ContractConfig,
@@ -31,8 +31,8 @@ pub struct AutopilotConfig {
     pub host_config: HostConfig,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ContractConfig {
     pub set: String,
     pub amount: u64,
@@ -46,8 +46,8 @@ pub struct ContractConfig {
     pub prune: bool,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct HostConfig {
     #[serde(rename = "allowRedundantIPs")]
     pub allow_redundant_ips: bool,
@@ -62,7 +62,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
         let json = r#"
         {
       "contracts": {
