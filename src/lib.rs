@@ -90,39 +90,21 @@ impl ClientInner {
             .join(endpoint)
             .expect("endpoint url join error");
 
-        let request_builder = match request {
-            RequestType::Get(params) => {
-                let mut r = self.reqwest_client.get(url);
-                if let Some(params) = params {
-                    r = r.query(params);
-                }
-                r
-            }
-            RequestType::Post(content, params) => {
-                let mut r = self.reqwest_client.post(url);
-                if let Some(content) = content {
-                    match content {
-                        RequestContent::Json(json) => r = r.json(json),
-                    }
-                }
-                if let Some(params) = params {
-                    r = r.query(params);
-                }
-                r
-            }
-            RequestType::Put(content, params) => {
-                let mut r = self.reqwest_client.put(url);
-                if let Some(content) = content {
-                    match content {
-                        RequestContent::Json(json) => r = r.json(json),
-                    }
-                }
-                if let Some(params) = params {
-                    r = r.query(params);
-                }
-                r
-            }
+        let (mut request_builder, content, params) = match request {
+            RequestType::Get(params) => (self.reqwest_client.get(url), &None, params),
+            RequestType::Post(content, params) => (self.reqwest_client.post(url), content, params),
+            RequestType::Put(content, params) => (self.reqwest_client.put(url), content, params),
         };
+
+        if let Some(params) = params {
+            request_builder = request_builder.query(params);
+        }
+
+        if let Some(content) = content {
+            match content {
+                RequestContent::Json(json) => request_builder = request_builder.json(json),
+            }
+        }
 
         let req = request_builder
             .basic_auth("api", Some(&self.api_password))
