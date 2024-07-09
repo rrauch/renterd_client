@@ -70,8 +70,9 @@ impl ClientInner {
         params: Option<Vec<(&'a str, String)>>,
     ) -> Result<Value, Error> {
         let bytes = self
-            .send_api_request(endpoint, &RequestType::Get(params))
+            .send_api_request(endpoint, &RequestType::Get(params), false)
             .await?
+            .expect("send_api_request should return a response")
             .bytes()
             .await?;
         Ok(
@@ -84,7 +85,8 @@ impl ClientInner {
         &self,
         endpoint: &str,
         request: &RequestType<'_>,
-    ) -> Result<Response, Error> {
+        not_found_as_none: bool,
+    ) -> Result<Option<Response>, Error> {
         let url = self
             .api_endpoint_url
             .join(endpoint)
@@ -116,9 +118,13 @@ impl ClientInner {
             return Err(Error::AuthenticationError);
         }
 
+        if not_found_as_none && resp.status().as_u16() == 404 {
+            return Ok(None);
+        }
+
         let _ = resp.error_for_status_ref()?;
 
-        Ok(resp)
+        Ok(Some(resp))
     }
 }
 

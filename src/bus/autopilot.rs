@@ -21,20 +21,23 @@ impl Api {
         )
     }
 
-    pub async fn get_by_id<S: AsRef<str>>(&self, id: S) -> Result<Autopilot, Error> {
+    pub async fn get_by_id<S: AsRef<str>>(&self, id: S) -> Result<Option<Autopilot>, Error> {
         let url = format!("./bus/autopilot/{}", id.as_ref());
-        Ok(self
+        if let Some(resp) = self
             .inner
-            .send_api_request(&url, &RequestType::Get(None))
+            .send_api_request(&url, &RequestType::Get(None), true)
             .await?
-            .json()
-            .await?)
+        {
+            Ok(Some(resp.json().await?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn update(&self, autopilot: &Autopilot) -> Result<(), Error> {
         let url = format!("./bus/autopilot/{}", autopilot.id.as_str());
         let req = update_req(autopilot)?;
-        let _ = self.inner.send_api_request(&url, &req).await?;
+        let _ = self.inner.send_api_request(&url, &req, false).await?;
         Ok(())
     }
 }

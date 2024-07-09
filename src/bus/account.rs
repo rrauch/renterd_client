@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, RequestContent, PublicKey, RequestType};
+use crate::{ClientInner, Error, PublicKey, RequestContent, RequestType};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -31,8 +31,9 @@ impl Api {
         let req = add_req(host_key)?;
         Ok(self
             .inner
-            .send_api_request(&url, &req)
+            .send_api_request(&url, &req, false)
             .await?
+            .expect("send_api_request should return a response")
             .json()
             .await?)
     }
@@ -48,8 +49,9 @@ impl Api {
         let req = lock_req(host_key, exclusive, duration)?;
         let resp: LockResponse = self
             .inner
-            .send_api_request(&url, &req)
+            .send_api_request(&url, &req, false)
             .await?
+            .expect("send_api_request should return a response")
             .json()
             .await?;
         Ok((resp.account, resp.lock_id))
@@ -58,7 +60,11 @@ impl Api {
     pub async fn unlock(&self, account_id: &PublicKey, lock_id: u64) -> Result<(), Error> {
         let url = format!("./bus/account/{}/unlock", account_id);
         let req = unlock_req(lock_id)?;
-        let _ = self.inner.send_api_request(&url, &req).await?;
+        let _ = self
+            .inner
+            .send_api_request(&url, &req, false)
+            .await?
+            .expect("send_api_request should return a response");
         Ok(())
     }
 
@@ -70,7 +76,7 @@ impl Api {
     ) -> Result<(), Error> {
         let url = format!("./bus/account/{}/add", account_id);
         let req = add_balance_req(host_key, amount)?;
-        let _ = self.inner.send_api_request(&url, &req).await?;
+        let _ = self.inner.send_api_request(&url, &req, false).await?;
         Ok(())
     }
 
@@ -82,7 +88,7 @@ impl Api {
     ) -> Result<(), Error> {
         let url = format!("./bus/account/{}/update", account_id);
         let req = update_balance_req(host_key, amount)?;
-        let _ = self.inner.send_api_request(&url, &req).await?;
+        let _ = self.inner.send_api_request(&url, &req, false).await?;
         Ok(())
     }
 
@@ -93,7 +99,7 @@ impl Api {
     ) -> Result<(), Error> {
         let url = format!("./bus/account/{}/requiressync", account_id);
         let req = requires_sync_req(host_key)?;
-        let _ = self.inner.send_api_request(&url, &req).await?;
+        let _ = self.inner.send_api_request(&url, &req, false).await?;
         Ok(())
     }
 
@@ -101,7 +107,7 @@ impl Api {
         let url = format!("./bus/account/{}/resetdrift", account_id);
         let _ = self
             .inner
-            .send_api_request(&url, &RequestType::Post(None, None))
+            .send_api_request(&url, &RequestType::Post(None, None), false)
             .await?;
         Ok(())
     }

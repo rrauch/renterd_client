@@ -39,7 +39,7 @@ impl Api {
         let req = dismiss_req(alert_ids)?;
         let _ = self
             .inner
-            .send_api_request("./bus/alerts/dismiss", &req)
+            .send_api_request("./bus/alerts/dismiss", &req, false)
             .await?;
         Ok(())
     }
@@ -48,7 +48,7 @@ impl Api {
         let req = register_req(alert)?;
         let _ = self
             .inner
-            .send_api_request("./bus/alerts/register", &req)
+            .send_api_request("./bus/alerts/register", &req, false)
             .await?;
         Ok(())
     }
