@@ -23,14 +23,13 @@ impl Api {
 
     pub async fn get_by_id<S: AsRef<str>>(&self, id: S) -> Result<Option<Autopilot>, Error> {
         let url = format!("./bus/autopilot/{}", id.as_ref());
-        if let Some(resp) = self
+        match self
             .inner
             .send_api_request(&url, &RequestType::Get(None), true)
             .await?
         {
-            Ok(Some(resp.json().await?))
-        } else {
-            Ok(None)
+            Some(resp) => Ok(Some(resp.json().await?)),
+            None => Ok(None),
         }
     }
 

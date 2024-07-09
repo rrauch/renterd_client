@@ -57,6 +57,7 @@ enum RequestType<'a> {
     Get(Option<Vec<(&'a str, String)>>),
     Post(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
     Put(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
+    Delete(Option<Vec<(&'a str, String)>>),
 }
 
 enum RequestContent {
@@ -96,6 +97,7 @@ impl ClientInner {
             RequestType::Get(params) => (self.reqwest_client.get(url), &None, params),
             RequestType::Post(content, params) => (self.reqwest_client.post(url), content, params),
             RequestType::Put(content, params) => (self.reqwest_client.put(url), content, params),
+            RequestType::Delete(params) => (self.reqwest_client.delete(url), &None, params),
         };
 
         if let Some(params) = params {
