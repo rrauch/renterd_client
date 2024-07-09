@@ -287,6 +287,15 @@ pub enum PublicKey {
     Ed25519([u8; 32]),
 }
 
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -485,15 +494,14 @@ pub(crate) mod duration_ns {
     use std::fmt::Formatter;
     use std::time::Duration;
 
-    pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(v: &Duration, serializer: S) -> Result<S::Ok, S::Error>
     where
-        T: AsRef<Duration>,
         S: Serializer,
     {
         Ok(
-            serializer.serialize_u64(v.as_ref().as_nanos().to_u64().ok_or(
-                serde::ser::Error::custom("nanoseconds cannot be represented as u64"),
-            )?)?,
+            serializer.serialize_u64(v.as_nanos().to_u64().ok_or(serde::ser::Error::custom(
+                "nanoseconds cannot be represented as u64",
+            ))?)?,
         )
     }
 
@@ -528,13 +536,12 @@ pub(crate) mod duration_ms {
     use std::fmt::Formatter;
     use std::time::Duration;
 
-    pub fn serialize<T, S>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(v: &Duration, serializer: S) -> Result<S::Ok, S::Error>
     where
-        T: AsRef<Duration>,
         S: Serializer,
     {
         Ok(
-            serializer.serialize_u64(v.as_ref().as_millis().to_u64().ok_or(
+            serializer.serialize_u64(v.as_millis().to_u64().ok_or(
                 serde::ser::Error::custom("milliseconds cannot be represented as u64"),
             )?)?,
         )
