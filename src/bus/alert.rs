@@ -62,9 +62,7 @@ fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Er
             )),
             None,
         ),
-        None => {
-            (None, Some(vec![("all", "true".to_string())]))
-        },
+        None => (None, Some(vec![("all", "true".to_string())])),
     };
     Ok(RequestType::Post(post_content, params))
 }
@@ -109,7 +107,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
         let json = r#"
 {
 	"alerts":
@@ -252,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_dismiss() -> anyhow::Result<()> {
+    fn dismiss() -> anyhow::Result<()> {
         let json = r#"
         [
     "h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b"
@@ -287,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_register() -> anyhow::Result<()> {
+    fn register() -> anyhow::Result<()> {
         let json = r#"
         {
         "id": "h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b",
