@@ -1,6 +1,8 @@
 use crate::autopilot::config::AutopilotConfig;
 use crate::Error::InvalidDataError;
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent, RequestType};
+use crate::{
+    ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent, RequestType,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -35,6 +37,27 @@ impl Api {
         let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
+
+    pub async fn check_host<S: AsRef<str>>(
+        &self,
+        id: S,
+        host_key: &PublicKey,
+    ) -> Result<(), Error> {
+        let _ = self
+            .inner
+            .send_api_request(&check_host_req(id, host_key))
+            .await?;
+        Ok(())
+    }
+}
+
+fn check_host_req<S: AsRef<str>>(id: S, host_key: &PublicKey) -> ApiRequest {
+    ApiRequestBuilder::put(format!(
+        "./bus/autopilot/{}/host/{}/check",
+        id.as_ref(),
+        host_key.to_string()
+    ))
+    .build()
 }
 
 fn list_req() -> ApiRequest {
@@ -179,6 +202,21 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Put);
         assert_eq!(req.params, None);
         assert_eq!(req.content, Some(RequestContent::Json(expected)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn check_host() -> anyhow::Result<()> {
+        let req = check_host_req(
+            "autopilot",
+            &"ed25519:70b75b1acff1f80f9ace0c048ce8651586254e23d19ba405dc6f226e81d08ca2"
+                .try_into()?,
+        );
+        assert_eq!(req.path, "./bus/autopilot/autopilot/host/ed25519:70b75b1acff1f80f9ace0c048ce8651586254e23d19ba405dc6f226e81d08ca2/check");
+        assert_eq!(req.request_type, RequestType::Put);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
 
         Ok(())
     }
