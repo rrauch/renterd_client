@@ -5,8 +5,7 @@ pub mod stats;
 use crate::worker::memory::Api as MemoryApi;
 use crate::worker::state::Api as StateApi;
 use crate::worker::stats::Api as StatsApi;
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ApiRequestBuilder, ClientInner, Error};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -28,10 +27,12 @@ impl Worker {
     }
 
     pub async fn id(&self) -> Result<String, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./worker/id", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&ApiRequestBuilder::get("./worker/id").build())
+            .await?
+            .json()
+            .await?)
     }
 
     pub fn memory(&self) -> &MemoryApi {

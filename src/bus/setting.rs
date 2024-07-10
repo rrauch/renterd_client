@@ -43,8 +43,7 @@ impl Api {
 }
 
 pub mod contract_set {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use serde::Deserialize;
     use std::sync::Arc;
 
@@ -59,13 +58,17 @@ pub mod contract_set {
         }
 
         pub async fn list(&self) -> Result<Settings, Error> {
-            Ok(serde_json::from_value(
-                self.inner
-                    .get_json("./bus/setting/contractset", None)
-                    .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req())
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req() -> ApiRequest {
+        ApiRequestBuilder::get("./bus/setting/contractset").build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -77,9 +80,16 @@ pub mod contract_set {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
 
         #[test]
-        fn deserialize() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req();
+            assert_eq!(req.path, "./bus/setting/contractset");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
             let json = r#"
             {
 	"default": "autopilot"
@@ -94,8 +104,7 @@ pub mod contract_set {
 }
 
 pub mod gouging {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use serde::Deserialize;
     use std::sync::Arc;
     use std::time::Duration;
@@ -111,11 +120,17 @@ pub mod gouging {
         }
 
         pub async fn list(&self) -> Result<Settings, Error> {
-            Ok(
-                serde_json::from_value(self.inner.get_json("./bus/setting/gouging", None).await?)
-                    .map_err(|e| InvalidDataError(e.into()))?,
-            )
+            Ok(self
+                .inner
+                .send_api_request(&list_req())
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req() -> ApiRequest {
+        ApiRequestBuilder::get("./bus/setting/gouging").build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -145,9 +160,16 @@ pub mod gouging {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
 
         #[test]
-        fn deserialize() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req();
+            assert_eq!(req.path, "./bus/setting/gouging");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
             let json = r#"
             {
 	"hostBlockHeightLeeway": 6,
@@ -187,8 +209,7 @@ pub mod gouging {
 }
 
 pub mod redundancy {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use serde::Deserialize;
     use std::sync::Arc;
 
@@ -203,13 +224,17 @@ pub mod redundancy {
         }
 
         pub async fn list(&self) -> Result<Settings, Error> {
-            Ok(serde_json::from_value(
-                self.inner
-                    .get_json("./bus/setting/redundancy", None)
-                    .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req())
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req() -> ApiRequest {
+        ApiRequestBuilder::get("./bus/setting/redundancy").build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -222,9 +247,16 @@ pub mod redundancy {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
 
         #[test]
-        fn deserialize() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req();
+            assert_eq!(req.path, "./bus/setting/redundancy");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
             let json = r#"
             {
 	"minShards": 2,
@@ -241,8 +273,7 @@ pub mod redundancy {
 }
 
 pub mod s3_authentication {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use serde::Deserialize;
     use std::collections::BTreeMap;
     use std::sync::Arc;
@@ -258,13 +289,17 @@ pub mod s3_authentication {
         }
 
         pub async fn list(&self) -> Result<Settings, Error> {
-            Ok(serde_json::from_value(
-                self.inner
-                    .get_json("./bus/setting/s3authentication", None)
-                    .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req())
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req() -> ApiRequest {
+        ApiRequestBuilder::get("./bus/setting/s3authentication").build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -276,9 +311,16 @@ pub mod s3_authentication {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
 
         #[test]
-        fn deserialize() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req();
+            assert_eq!(req.path, "./bus/setting/s3authentication");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
             let json = r#"
             {
 	"v4Keypairs": {
@@ -298,8 +340,7 @@ pub mod s3_authentication {
 }
 
 pub mod upload_packing {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use serde::Deserialize;
     use std::sync::Arc;
 
@@ -314,13 +355,17 @@ pub mod upload_packing {
         }
 
         pub async fn list(&self) -> Result<Settings, Error> {
-            Ok(serde_json::from_value(
-                self.inner
-                    .get_json("./bus/setting/uploadpacking", None)
-                    .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req())
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req() -> ApiRequest {
+        ApiRequestBuilder::get("./bus/setting/uploadpacking").build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -333,9 +378,16 @@ pub mod upload_packing {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
 
         #[test]
-        fn deserialize() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req();
+            assert_eq!(req.path, "./bus/setting/uploadpacking");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
             let json = r#"
             {
 	"enabled": true,

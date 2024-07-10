@@ -1,6 +1,5 @@
-use crate::{ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner};
 use chrono::{DateTime, Utc};
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -45,25 +44,22 @@ impl Api {
     }
 }
 
-async fn list(
-    inner: &ClientInner,
+fn list_req(
     key: &str,
-    mut params: Vec<(&str, String)>,
+    mut params: Vec<(&'static str, String)>,
     start: &DateTime<Utc>,
     interval: &Duration,
     number_intervals: u16,
-) -> Result<Value, Error> {
+) -> ApiRequest {
+    let url = format!("./bus/metric/{}", key);
     params.push(("start", start.to_rfc3339()));
     params.push(("interval", format!("{}", interval.as_millis())));
     params.push(("n", format!("{}", number_intervals)));
-    let url = format!("./bus/metric/{}", key);
-    inner.get_json(&url, Some(params)).await
+    ApiRequestBuilder::get(url).params(Some(params)).build()
 }
 
 pub mod contract {
-    use crate::bus::metrics::list;
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error, FileContractId, PublicKey};
+    use crate::{ApiRequest, ClientInner, Error, FileContractId, PublicKey};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -87,25 +83,41 @@ pub mod contract {
             interval: &Duration,
             number_intervals: u16,
         ) -> Result<Vec<Metric>, Error> {
-            Ok(serde_json::from_value(
-                list(
-                    &self.inner,
-                    "contract",
-                    [
-                        contract_id.map(|i| ("contractID", i.to_string())),
-                        host_key.map(|k| ("hostKey", k.to_string())),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+            Ok(self
+                .inner
+                .send_api_request(&list_req(
+                    contract_id,
+                    host_key,
                     start,
                     interval,
                     number_intervals,
-                )
-                .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+                ))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(
+        contract_id: Option<FileContractId>,
+        host_key: Option<PublicKey>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> ApiRequest {
+        super::list_req(
+            "contract",
+            [
+                contract_id.map(|i| ("contractID", i.to_string())),
+                host_key.map(|k| ("hostKey", k.to_string())),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+            start,
+            interval,
+            number_intervals,
+        )
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -137,7 +149,9 @@ pub mod contract {
         use super::*;
 
         #[test]
-        fn deserialize_list() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            //todo: request tests
+
             let json = r#"
             [
   {
@@ -212,9 +226,7 @@ pub mod contract {
 }
 
 pub mod churn {
-    use crate::bus::metrics::list;
-    use crate::deserialize_option_string;
-    use crate::Error::InvalidDataError;
+    use crate::{deserialize_option_string, ApiRequest};
     use crate::{ClientInner, Error, FileContractId};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
@@ -240,26 +252,44 @@ pub mod churn {
             interval: &Duration,
             number_intervals: u16,
         ) -> Result<Vec<Metric>, Error> {
-            Ok(serde_json::from_value(
-                list(
-                    &self.inner,
-                    "churn",
-                    [
-                        name.map(|n| ("name", n)),
-                        direction.map(|d| ("direction", d)),
-                        reason.map(|r| ("reason", r)),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+            Ok(self
+                .inner
+                .send_api_request(&list_req(
+                    name,
+                    direction,
+                    reason,
                     start,
                     interval,
                     number_intervals,
-                )
-                .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+                ))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(
+        name: Option<String>,
+        direction: Option<String>,
+        reason: Option<String>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> ApiRequest {
+        super::list_req(
+            "churn",
+            [
+                name.map(|n| ("name", n)),
+                direction.map(|d| ("direction", d)),
+                reason.map(|r| ("reason", r)),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+            start,
+            interval,
+            number_intervals,
+        )
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -274,13 +304,11 @@ pub mod churn {
         pub timestamp: DateTime<FixedOffset>,
     }
 
-    //todo: add tests when we have some test data
+    //todo: add tests when test data becomes available
 }
 
 pub mod contract_set {
-    use crate::bus::metrics::list;
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ClientInner, Error};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -303,19 +331,28 @@ pub mod contract_set {
             interval: &Duration,
             number_intervals: u16,
         ) -> Result<Vec<Metric>, Error> {
-            Ok(serde_json::from_value(
-                list(
-                    &self.inner,
-                    "contractset",
-                    [name.map(|n| ("name", n))].into_iter().flatten().collect(),
-                    start,
-                    interval,
-                    number_intervals,
-                )
-                .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req(name, start, interval, number_intervals))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(
+        name: Option<String>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> ApiRequest {
+        super::list_req(
+            "contractset",
+            [name.map(|n| ("name", n))].into_iter().flatten().collect(),
+            start,
+            interval,
+            number_intervals,
+        )
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -330,9 +367,7 @@ pub mod contract_set {
 }
 
 pub mod contract_prune {
-    use crate::bus::metrics::list;
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error, FileContractId, PublicKey};
+    use crate::{ApiRequest, ClientInner, Error, FileContractId, PublicKey};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -357,26 +392,44 @@ pub mod contract_prune {
             interval: &Duration,
             number_intervals: u16,
         ) -> Result<Vec<Metric>, Error> {
-            Ok(serde_json::from_value(
-                list(
-                    &self.inner,
-                    "contractprune",
-                    [
-                        contract_id.map(|c| ("contractID", c.to_string())),
-                        host_key.map(|h| ("hostKey", h.to_string())),
-                        host_version.map(|h| ("hostVersion", h)),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+            Ok(self
+                .inner
+                .send_api_request(&list_req(
+                    contract_id,
+                    host_key,
+                    host_version,
                     start,
                     interval,
                     number_intervals,
-                )
-                .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+                ))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(
+        contract_id: Option<FileContractId>,
+        host_key: Option<PublicKey>,
+        host_version: Option<String>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> ApiRequest {
+        super::list_req(
+            "contractprune",
+            [
+                contract_id.map(|c| ("contractID", c.to_string())),
+                host_key.map(|h| ("hostKey", h.to_string())),
+                host_version.map(|h| ("hostVersion", h)),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+            start,
+            interval,
+            number_intervals,
+        )
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -397,9 +450,7 @@ pub mod contract_prune {
 }
 
 pub mod wallet {
-    use crate::bus::metrics::list;
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ClientInner, Error};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -421,19 +472,17 @@ pub mod wallet {
             interval: &Duration,
             number_intervals: u16,
         ) -> Result<Vec<Metric>, Error> {
-            Ok(serde_json::from_value(
-                list(
-                    &self.inner,
-                    "wallet",
-                    vec![],
-                    start,
-                    interval,
-                    number_intervals,
-                )
-                .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req(start, interval, number_intervals))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(start: &DateTime<Utc>, interval: &Duration, number_intervals: u16) -> ApiRequest {
+        super::list_req("wallet", vec![], start, interval, number_intervals)
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -448,5 +497,5 @@ pub mod wallet {
         pub unconfirmed: u128,
     }
 
-    //todo: add tests when we have some test data
+    //todo: add tests when test data becomes available
 }

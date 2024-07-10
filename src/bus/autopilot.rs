@@ -1,6 +1,6 @@
 use crate::autopilot::config::AutopilotConfig;
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, RequestContent, RequestType};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent, RequestType};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -15,39 +15,42 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<Vec<Autopilot>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/autopilots", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn get_by_id<S: AsRef<str>>(&self, id: S) -> Result<Option<Autopilot>, Error> {
-        let url = format!("./bus/autopilot/{}", id.as_ref());
-        match self
-            .inner
-            .send_api_request(&url, &RequestType::Get(None), true)
-            .await?
-        {
+        match self.inner.send_api_request_optional(&get_req(id)).await? {
             Some(resp) => Ok(Some(resp.json().await?)),
             None => Ok(None),
         }
     }
 
     pub async fn update(&self, autopilot: &Autopilot) -> Result<(), Error> {
-        let url = format!("./bus/autopilot/{}", autopilot.id.as_str());
         let req = update_req(autopilot)?;
-        let _ = self.inner.send_api_request(&url, &req, false).await?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 }
 
-fn update_req(autopilot: &Autopilot) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Put(
-        Some(RequestContent::Json(
-            serde_json::to_value(autopilot).map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/autopilots").build()
+}
+
+fn get_req<S: AsRef<str>>(id: S) -> ApiRequest {
+    ApiRequestBuilder::get(format!("./bus/autopilot/{}", id.as_ref())).build()
+}
+
+fn update_req(autopilot: &Autopilot) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/autopilot/{}", autopilot.id.as_str());
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(autopilot).map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::put(url).content(content).build())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,6 +69,12 @@ mod tests {
 
     #[test]
     fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/autopilots");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
 [
   {
@@ -165,12 +174,11 @@ mod tests {
             current_period: 428982,
         };
 
-        match update_req(&autopilot)? {
-            RequestType::Put(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = update_req(&autopilot)?;
+        assert_eq!(req.path, "./bus/autopilot/autopilot");
+        assert_eq!(req.request_type, RequestType::Put);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }

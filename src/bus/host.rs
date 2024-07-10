@@ -1,10 +1,10 @@
-use crate::deserialize_option_string;
-use crate::Error::InvalidDataError;
+use crate::{deserialize_option_string, ApiRequest, ApiRequestBuilder};
 use crate::{ClientInner, Error, PublicKey, SettingsId};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,12 +18,35 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<Vec<Host>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/hosts", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+    pub async fn list(
+        &self,
+        offset: Option<NonZeroUsize>,
+        limit: Option<NonZeroUsize>,
+    ) -> Result<Vec<Host>, Error> {
+        Ok(self
+            .inner
+            .send_api_request(&list_req(offset, limit))
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn list_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
+    let mut params = Vec::with_capacity(2);
+    if let Some(offset) = offset {
+        params.push(("offset", offset.to_string()));
+    }
+    if let Some(limit) = limit {
+        params.push(("limit", limit.to_string()));
+    }
+    let params = if params.is_empty() {
+        None
+    } else {
+        Some(params)
+    };
+
+    ApiRequestBuilder::get("./bus/hosts").params(params).build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -277,9 +300,28 @@ pub struct UsabilityBreakDown {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
+        let req = list_req(None, None);
+        assert_eq!(req.path, "./bus/hosts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
+        let req = list_req(Some(10.try_into()?), None);
+        assert_eq!(req.params, Some(vec![("offset".into(), "10".into())]));
+
+        let req = list_req(Some(10.try_into()?), Some(20.try_into()?));
+        assert_eq!(
+            req.params,
+            Some(vec![
+                ("offset".into(), "10".into()),
+                ("limit".into(), "20".into())
+            ])
+        );
+
         let json = r#"
 [
   {

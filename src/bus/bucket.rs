@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, RequestContent, RequestType};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent, RequestType};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -15,19 +15,16 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<Vec<Bucket>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/buckets", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn get_by_name<S: AsRef<str>>(&self, name: S) -> Result<Option<Bucket>, Error> {
-        let url = format!("./bus/bucket/{}", name.as_ref());
-        match self
-            .inner
-            .send_api_request(&url, &RequestType::Get(None), true)
-            .await?
-        {
+        match self.inner.send_api_request_optional(&get_req(name)).await? {
             Some(resp) => Ok(Some(resp.json().await?)),
             None => Ok(None),
         }
@@ -39,10 +36,7 @@ impl Api {
         public_read_access: bool,
     ) -> Result<(), Error> {
         let req = create_req(name.as_ref(), public_read_access)?;
-        let _ = self
-            .inner
-            .send_api_request("./bus/buckets", &req, false)
-            .await?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
@@ -51,32 +45,41 @@ impl Api {
         name: S,
         public_read_access: bool,
     ) -> Result<(), Error> {
-        let url = format!("./bus/bucket/{}/policy", name.as_ref());
-        let req = update_req(public_read_access)?;
-        let _ = self.inner.send_api_request(&url, &req, false).await?;
+        let req = update_req(name, public_read_access)?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
     pub async fn delete<S: AsRef<str>>(&self, name: S) -> Result<(), Error> {
-        let url = format!("./bus/bucket/{}", name.as_ref());
-        let _ = self
-            .inner
-            .send_api_request(&url, &RequestType::Delete(None), false)
-            .await?;
+        let req = delete_req(name);
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 }
 
-fn update_req(public_read_access: bool) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Put(
-        Some(RequestContent::Json(
-            serde_json::to_value(UpdatePolicyRequest {
-                policy: &Policy { public_read_access },
-            })
-            .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/buckets").build()
+}
+
+fn get_req<S: AsRef<str>>(name: S) -> ApiRequest {
+    ApiRequestBuilder::get(format!("./bus/bucket/{}", name.as_ref())).build()
+}
+
+fn update_req<S: AsRef<str>>(name: S, public_read_access: bool) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/bucket/{}/policy", name.as_ref());
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(UpdatePolicyRequest {
+            policy: &Policy { public_read_access },
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+
+    Ok(ApiRequestBuilder::put(url).content(content).build())
+}
+
+fn delete_req<S: AsRef<str>>(name: S) -> ApiRequest {
+    let url = format!("./bus/bucket/{}", name.as_ref());
+    ApiRequestBuilder::delete(url).build()
 }
 
 #[derive(Serialize)]
@@ -85,17 +88,18 @@ struct UpdatePolicyRequest<'a> {
     policy: &'a Policy,
 }
 
-fn create_req(name: &str, public_read_access: bool) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(CreateRequest {
-                name,
-                policy: &Policy { public_read_access },
-            })
-            .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn create_req(name: &str, public_read_access: bool) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(CreateRequest {
+            name,
+            policy: &Policy { public_read_access },
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+
+    Ok(ApiRequestBuilder::post("./bus/buckets")
+        .content(content)
+        .build())
 }
 
 #[derive(Serialize)]
@@ -126,6 +130,12 @@ mod tests {
 
     #[test]
     fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/buckets");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         [
   {
@@ -186,12 +196,11 @@ mod tests {
         "#;
         let expected: Value = serde_json::from_str(&json)?;
 
-        match create_req("movies", false)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = create_req("movies", false)?;
+        assert_eq!(req.path, "./bus/buckets");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }
@@ -207,12 +216,11 @@ mod tests {
         "#;
         let expected: Value = serde_json::from_str(&json)?;
 
-        match update_req(true)? {
-            RequestType::Put(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = update_req("bucket_name", true)?;
+        assert_eq!(req.path, "./bus/bucket/bucket_name/policy");
+        assert_eq!(req.request_type, RequestType::Put);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }

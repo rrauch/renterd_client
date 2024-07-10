@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -13,24 +12,45 @@ impl Api {
     }
 
     pub async fn address(&self) -> Result<String, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/syncer/address", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&address_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn peers(&self) -> Result<Vec<String>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/syncer/peers", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&peers_req())
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn address_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/syncer/address").build()
+}
+
+fn peers_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/syncer/peers").build()
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::bus::syncer::{address_req, peers_req};
+    use crate::RequestType;
+
     #[test]
-    fn deserialize_address() -> anyhow::Result<()> {
+    fn address() -> anyhow::Result<()> {
+        let req = address_req();
+        assert_eq!(req.path, "./bus/syncer/address");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         "127.102.123.11:9881""#;
         let address: String = serde_json::from_str(&json)?;
@@ -39,7 +59,13 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_peers() -> anyhow::Result<()> {
+    fn peers() -> anyhow::Result<()> {
+        let req = peers_req();
+        assert_eq!(req.path, "./bus/syncer/peers");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         [
 	"127.81.56.1:11081",

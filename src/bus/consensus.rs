@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -15,11 +14,17 @@ impl Api {
     }
 
     pub async fn state(&self) -> Result<State, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/consensus/state", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&state_req())
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn state_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/consensus/state").build()
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, Hash};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Hash};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -14,18 +13,32 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<Wallet, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/wallet", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn outputs(&self) -> Result<Vec<Output>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/wallet/outputs", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&outputs_req())
+            .await?
+            .json()
+            .await?)
     }
+
+    //todo: implement missing wallet functions
+}
+
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/wallet").build()
+}
+
+fn outputs_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/wallet/outputs").build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -54,9 +67,16 @@ pub struct Output {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
-    fn deserialize_wallet() -> anyhow::Result<()> {
+    fn wallet() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/wallet");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
   "scanHeight": 436326,
@@ -75,7 +95,13 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_outputs() -> anyhow::Result<()> {
+    fn outputs() -> anyhow::Result<()> {
+        let req = outputs_req();
+        assert_eq!(req.path, "./bus/wallet/outputs");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         [
   {

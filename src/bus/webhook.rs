@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -15,12 +14,19 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<(Vec<Webhook>, Vec<Queue>), Error> {
-        let resp: Response =
-            serde_json::from_value(self.inner.get_json("./bus/webhooks", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?;
+        let resp: Response = self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?;
 
         Ok((resp.webhooks, resp.queues))
     }
+}
+
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/webhooks").build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -50,9 +56,16 @@ pub struct Queue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/webhooks");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
        {
   "webhooks": [

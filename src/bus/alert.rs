@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, Hash, RequestContent, RequestType};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Hash, RequestContent, RequestType};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,40 +22,46 @@ impl Api {
         offset: Option<NonZeroUsize>,
         limit: Option<NonZeroUsize>,
     ) -> Result<(Vec<Alert>, bool), Error> {
-        let offset = offset.map(|o| o.to_string()).unwrap_or("0".to_string());
-        let limit = limit.map(|l| l.to_string()).unwrap_or("-1".to_string());
-        let mut params = Vec::with_capacity(2);
-        params.push(("offset", offset));
-        params.push(("limit", limit));
-
-        let response: ListResponse =
-            serde_json::from_value(self.inner.get_json("./bus/alerts", Some(params)).await?)
-                .map_err(|e| InvalidDataError(e.into()))?;
+        let req = list_req(offset, limit);
+        let response: ListResponse = self.inner.send_api_request(&req).await?.json().await?;
 
         Ok((response.alerts.unwrap_or(vec![]), response.has_more))
     }
 
     pub async fn dismiss(&self, alert_ids: Option<Vec<&Hash>>) -> Result<(), Error> {
         let req = dismiss_req(alert_ids)?;
-        let _ = self
-            .inner
-            .send_api_request("./bus/alerts/dismiss", &req, false)
-            .await?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
     pub async fn register(&self, alert: &Alert) -> Result<(), Error> {
         let req = register_req(alert)?;
-        let _ = self
-            .inner
-            .send_api_request("./bus/alerts/register", &req, false)
-            .await?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 }
 
-fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Error> {
-    let (post_content, params) = match alert_ids.filter(|h| !h.is_empty()) {
+fn list_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
+    let mut params = Vec::with_capacity(2);
+    if let Some(offset) = offset {
+        params.push(("offset", offset.to_string()));
+    }
+    if let Some(limit) = limit {
+        params.push(("limit", limit.to_string()));
+    }
+    let params = if params.is_empty() {
+        None
+    } else {
+        Some(params)
+    };
+
+    ApiRequestBuilder::get("./bus/alerts")
+        .params(params)
+        .build()
+}
+
+fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<ApiRequest, Error> {
+    let (content, params) = match alert_ids.filter(|h| !h.is_empty()) {
         Some(hashes) => (
             Some(RequestContent::Json(
                 serde_json::to_value(hashes).map_err(|e| InvalidDataError(e.into()))?,
@@ -64,16 +70,19 @@ fn dismiss_req(alert_ids: Option<Vec<&Hash>>) -> Result<RequestType<'static>, Er
         ),
         None => (None, Some(vec![("all", "true".to_string())])),
     };
-    Ok(RequestType::Post(post_content, params))
+    Ok(ApiRequestBuilder::post("./bus/alerts/dismiss")
+        .content(content)
+        .params(params)
+        .build())
 }
 
-fn register_req(alert: &Alert) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(alert).map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn register_req(alert: &Alert) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(alert).map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post("./bus/alerts/register")
+        .content(content)
+        .build())
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -108,6 +117,30 @@ mod tests {
 
     #[test]
     fn list() -> anyhow::Result<()> {
+        let req = list_req(None, None);
+        assert_eq!(req.path, "./bus/alerts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.content, None);
+        assert_eq!(req.params, None);
+
+        let req = list_req(Some(10.try_into()?), None);
+        assert_eq!(req.path, "./bus/alerts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.content, None);
+        assert_eq!(req.params, Some(vec![("offset".into(), "10".into())]));
+
+        let req = list_req(Some(10.try_into()?), Some(20.try_into()?));
+        assert_eq!(req.path, "./bus/alerts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.content, None);
+        assert_eq!(
+            req.params,
+            Some(vec![
+                ("offset".into(), "10".into()),
+                ("limit".into(), "20".into())
+            ])
+        );
+
         let json = r#"
 {
 	"alerts":
@@ -258,28 +291,25 @@ mod tests {
         "#;
         let expected: Value = serde_json::from_str(&json)?;
 
-        match dismiss_req(Some(vec![
+        let req = dismiss_req(Some(vec![
             &"h:804f827c66292c17c6388aecf3a98bc25c09c32ddefc289e754899bf0e93f78b".try_into()?,
-        ]))? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        ]))?;
+        assert_eq!(req.path, "./bus/alerts/dismiss");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
-        match dismiss_req(None)? {
-            RequestType::Post(None, Some(params)) => {
-                assert_eq!(params, vec![("all", "true".to_string())])
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = dismiss_req(None)?;
+        assert_eq!(req.path, "./bus/alerts/dismiss");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, Some(vec![("all".into(), "true".into())]));
+        assert_eq!(req.content, None);
 
-        match dismiss_req(Some(vec![]))? {
-            RequestType::Post(None, Some(params)) => {
-                assert_eq!(params, vec![("all", "true".to_string())])
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = dismiss_req(Some(vec![]))?;
+        assert_eq!(req.path, "./bus/alerts/dismiss");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, Some(vec![("all".into(), "true".into())]));
+        assert_eq!(req.content, None);
 
         Ok(())
     }
@@ -335,12 +365,11 @@ mod tests {
             data: Some(data)
         };
 
-        match register_req(&alert)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected);
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = register_req(&alert)?;
+        assert_eq!(req.path, "./bus/alerts/register");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }

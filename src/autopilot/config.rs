@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, PublicKey};
+use crate::{ApiRequestBuilder, ClientInner, Error, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -15,10 +14,12 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<AutopilotConfig, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./autopilot/config", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&ApiRequestBuilder::get("./autopilot/config").build())
+            .await?
+            .json()
+            .await?)
     }
 }
 

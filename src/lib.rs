@@ -8,6 +8,7 @@ use reqwest::{Client as ReqwestClient, Response};
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -53,58 +54,107 @@ impl Drop for ClientInner {
     }
 }
 
-enum RequestType<'a> {
-    Get(Option<Vec<(&'a str, String)>>),
-    Post(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
-    Put(Option<RequestContent>, Option<Vec<(&'a str, String)>>),
-    Delete(Option<Vec<(&'a str, String)>>),
+struct ApiRequest {
+    path: Cow<'static, str>,
+    params: Option<Vec<(Cow<'static, str>, Cow<'static, str>)>>,
+    content: Option<RequestContent>,
+    request_type: RequestType,
 }
 
+struct ApiRequestBuilder {
+    request: ApiRequest,
+}
+
+impl ApiRequestBuilder {
+    fn new<T: Into<Cow<'static, str>>>(path: T, request_type: RequestType) -> Self {
+        Self {
+            request: ApiRequest {
+                request_type,
+                path: path.into(),
+                params: None,
+                content: None,
+            },
+        }
+    }
+
+    pub(crate) fn get<T: Into<Cow<'static, str>>>(path: T) -> Self {
+        Self::new(path, RequestType::Get)
+    }
+
+    pub(crate) fn post<T: Into<Cow<'static, str>>>(path: T) -> Self {
+        Self::new(path, RequestType::Post)
+    }
+
+    pub(crate) fn put<T: Into<Cow<'static, str>>>(path: T) -> Self {
+        Self::new(path, RequestType::Put)
+    }
+
+    pub(crate) fn delete<T: Into<Cow<'static, str>>>(path: T) -> Self {
+        Self::new(path, RequestType::Delete)
+    }
+
+    pub(crate) fn params<K: Into<Cow<'static, str>>, V: Into<Cow<'static, str>>>(
+        mut self,
+        params: Option<Vec<(K, V)>>,
+    ) -> Self {
+        self.request.params =
+            params.map(|v| v.into_iter().map(|(k, v)| (k.into(), v.into())).collect());
+        self
+    }
+
+    pub(crate) fn content(mut self, content: Option<RequestContent>) -> Self {
+        self.request.content = content;
+        self
+    }
+
+    pub(crate) fn build(self) -> ApiRequest {
+        self.request
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum RequestType {
+    Get,
+    Post,
+    Put,
+    Delete,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 enum RequestContent {
     Json(Value),
 }
 
 impl ClientInner {
-    pub(crate) async fn get_json<'a>(
-        &self,
-        endpoint: &str,
-        params: Option<Vec<(&'a str, String)>>,
-    ) -> Result<Value, Error> {
-        let bytes = self
-            .send_api_request(endpoint, &RequestType::Get(params), false)
-            .await?
-            .expect("send_api_request should return a response")
-            .bytes()
-            .await?;
-        Ok(
-            serde_json::from_slice(bytes.as_ref())
-                .map_err(|e| Error::InvalidDataError(e.into()))?,
-        )
+    async fn send_api_request(&self, request: &ApiRequest) -> Result<Response, crate::Error> {
+        match self.send_api_request_optional(request).await {
+            Ok(Some(resp)) => Ok(resp),
+            Ok(None) => Err(Error::NotFoundError),
+            Err(e) => Err(e),
+        }
     }
 
-    async fn send_api_request(
+    async fn send_api_request_optional(
         &self,
-        endpoint: &str,
-        request: &RequestType<'_>,
-        not_found_as_none: bool,
+        request: &ApiRequest,
     ) -> Result<Option<Response>, Error> {
         let url = self
             .api_endpoint_url
-            .join(endpoint)
+            .join(request.path.as_ref())
             .expect("endpoint url join error");
 
-        let (mut request_builder, content, params) = match request {
-            RequestType::Get(params) => (self.reqwest_client.get(url), &None, params),
-            RequestType::Post(content, params) => (self.reqwest_client.post(url), content, params),
-            RequestType::Put(content, params) => (self.reqwest_client.put(url), content, params),
-            RequestType::Delete(params) => (self.reqwest_client.delete(url), &None, params),
+        let mut request_builder = match request.request_type {
+            RequestType::Get => self.reqwest_client.get(url),
+            RequestType::Post => self.reqwest_client.post(url),
+            RequestType::Put => self.reqwest_client.put(url),
+            RequestType::Delete => self.reqwest_client.delete(url),
         };
 
-        if let Some(params) = params {
+        if let Some(params) = &request.params {
             request_builder = request_builder.query(params);
         }
 
-        if let Some(content) = content {
+        if let Some(content) = &request.content {
             match content {
                 RequestContent::Json(json) => request_builder = request_builder.json(json),
             }
@@ -120,7 +170,7 @@ impl ClientInner {
             return Err(Error::AuthenticationError);
         }
 
-        if not_found_as_none && resp.status().as_u16() == 404 {
+        if resp.status().as_u16() == 404 {
             return Ok(None);
         }
 
@@ -150,6 +200,8 @@ pub enum Error {
     AuthenticationError,
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error("server sent 404 not found")]
+    NotFoundError,
 }
 
 #[derive(Error, Debug)]

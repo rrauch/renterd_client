@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
@@ -26,24 +25,42 @@ impl Api {
         marker: Option<String>,
         limit: Option<usize>,
     ) -> Result<(Option<Object>, Option<Vec<Metadata>>, bool), Error> {
-        let path = encode_path(path);
-        let params: Vec<_> = [
-            bucket.map(|b| ("bucket", b)),
-            prefix.map(|p| ("prefix", p)),
-            offset.map(|o| ("offset", format!("{}", o))),
-            marker.map(|m| ("marker", m)),
-            limit.map(|l| ("limit", format!("{}", l))),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-        let params = (!params.is_empty()).then(|| params);
-
-        let response: ListResponse =
-            serde_json::from_value(self.inner.get_json(path.as_ref(), params).await?)
-                .map_err(|e| InvalidDataError(e.into()))?;
-        Ok((response.object, response.entries, response.has_more))
+        match self
+            .inner
+            .send_api_request_optional(&list_req(path, bucket, prefix, offset, marker, limit))
+            .await?
+        {
+            Some(resp) => {
+                let response: ListResponse = resp.json().await?;
+                Ok((response.object, response.entries, response.has_more))
+            }
+            None => Ok((None, None, false)),
+        }
     }
+}
+
+fn list_req<S: AsRef<str>>(
+    path: S,
+    bucket: Option<String>,
+    prefix: Option<String>,
+    offset: Option<usize>,
+    marker: Option<String>,
+    limit: Option<usize>,
+) -> ApiRequest {
+    let path = encode_path(path);
+    let params: Vec<_> = [
+        bucket.map(|b| ("bucket", b)),
+        prefix.map(|p| ("prefix", p)),
+        offset.map(|o| ("offset", format!("{}", o))),
+        marker.map(|m| ("marker", m)),
+        limit.map(|l| ("limit", format!("{}", l))),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let params = (!params.is_empty()).then(|| params);
+
+    ApiRequestBuilder::get(path).params(params).build()
 }
 
 #[derive(Deserialize)]
@@ -89,6 +106,8 @@ fn encode_path<S: AsRef<str>>(path: S) -> String {
 mod tests {
     use super::*;
     use std::str::FromStr;
+
+    //todo: test list_req
 
     #[test]
     fn deserialize_list_dir() -> anyhow::Result<()> {

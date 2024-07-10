@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, FileContractId, PublicKey};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, FileContractId, PublicKey};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -13,12 +12,26 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<Vec<Contract>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/contracts", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+    pub async fn list(&self, contract_set: Option<String>) -> Result<Vec<Contract>, Error> {
+        Ok(self
+            .inner
+            .send_api_request(&list_req(contract_set))
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn list_req(contract_set: Option<String>) -> ApiRequest {
+    let params = if let Some(contract_set) = contract_set {
+        Some(vec![("contractset", contract_set)])
+    } else {
+        None
+    };
+
+    ApiRequestBuilder::get("./bus/contracts")
+        .params(params)
+        .build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -84,9 +97,22 @@ pub struct Spending {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
+        let req = list_req(None);
+        assert_eq!(req.path, "./bus/contracts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
+        let req = list_req(Some("foo_id".to_string()));
+        assert_eq!(
+            req.params,
+            Some(vec![("contractset".into(), "foo_id".into())])
+        );
+
         let json = r#"
         [
   {

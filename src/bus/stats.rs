@@ -19,8 +19,7 @@ impl Api {
 }
 
 pub mod objects {
-    use crate::Error::InvalidDataError;
-    use crate::{ClientInner, Error};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
     use bigdecimal::BigDecimal;
     use serde::Deserialize;
     use std::sync::Arc;
@@ -36,13 +35,20 @@ pub mod objects {
         }
 
         pub async fn list(&self, bucket: Option<String>) -> Result<Stats, Error> {
-            Ok(serde_json::from_value(
-                self.inner
-                    .get_json("./bus/stats/objects", bucket.map(|b| vec![("bucket", b)]))
-                    .await?,
-            )
-            .map_err(|e| InvalidDataError(e.into()))?)
+            Ok(self
+                .inner
+                .send_api_request(&list_req(bucket))
+                .await?
+                .json()
+                .await?)
         }
+    }
+
+    fn list_req(bucket: Option<String>) -> ApiRequest {
+        let params = bucket.map(|b| vec![("bucket", b)]);
+        ApiRequestBuilder::get("./bus/stats/objects")
+            .params(params)
+            .build()
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -61,10 +67,26 @@ pub mod objects {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::RequestType;
         use std::str::FromStr;
 
         #[test]
-        fn deserialize_list() -> anyhow::Result<()> {
+        fn list() -> anyhow::Result<()> {
+            let req = list_req(None);
+            assert_eq!(req.path, "./bus/stats/objects");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(req.params, None);
+            assert_eq!(req.content, None);
+
+            let req = list_req(Some("foo-bucket".to_string()));
+            assert_eq!(req.path, "./bus/stats/objects");
+            assert_eq!(req.request_type, RequestType::Get);
+            assert_eq!(
+                req.params,
+                Some(vec![("bucket".into(), "foo-bucket".into())])
+            );
+            assert_eq!(req.content, None);
+
             let json = r#"
 {
 	"numObjects": 8,

@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, Percentage, PublicKey};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Percentage, PublicKey};
 use bandwidth::Bandwidth;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -15,20 +14,30 @@ impl Api {
     }
 
     pub async fn download(&self) -> Result<Download, Error> {
-        Ok(serde_json::from_value(
-            self.inner
-                .get_json("./worker/stats/downloads", None)
-                .await?,
-        )
-        .map_err(|e| InvalidDataError(e.into()))?)
+        Ok(self
+            .inner
+            .send_api_request(&download_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn upload(&self) -> Result<Upload, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./worker/stats/uploads", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&upload_req())
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn download_req() -> ApiRequest {
+    ApiRequestBuilder::get("./worker/stats/downloads").build()
+}
+
+fn upload_req() -> ApiRequest {
+    ApiRequestBuilder::get("./worker/stats/uploads").build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -80,14 +89,20 @@ pub struct Uploader {
 
 #[cfg(test)]
 mod tests {
-    use crate::worker::stats::{Download, Upload};
-    use crate::PublicKey;
+    use crate::worker::stats::{download_req, upload_req, Download, Upload};
+    use crate::{PublicKey, RequestType};
     use bandwidth::Bandwidth;
     use bigdecimal::BigDecimal;
     use std::str::FromStr;
 
     #[test]
-    fn deserialize_download() -> anyhow::Result<()> {
+    fn download() -> anyhow::Result<()> {
+        let req = download_req();
+        assert_eq!(req.path, "./worker/stats/downloads");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
   "avgDownloadSpeedMbps": 277.89,
@@ -157,7 +172,13 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_upload() -> anyhow::Result<()> {
+    fn upload() -> anyhow::Result<()> {
+        let req = upload_req();
+        assert_eq!(req.path, "./worker/stats/uploads");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
   "avgSlabUploadSpeedMbps": 15.05,

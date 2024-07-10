@@ -1,5 +1,4 @@
-use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, State as CommonState};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, State as CommonState};
 use chrono::DateTime;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -15,11 +14,17 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<State, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/state", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?)
     }
+}
+
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/state").build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -32,9 +37,16 @@ pub struct State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/state");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
   "startTime": "2023-09-22T19:08:16.677593561Z",

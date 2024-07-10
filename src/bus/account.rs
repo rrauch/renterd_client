@@ -1,5 +1,7 @@
 use crate::Error::InvalidDataError;
-use crate::{ClientInner, Error, PublicKey, RequestContent, RequestType};
+use crate::{
+    ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent, RequestType,
+};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -16,10 +18,12 @@ impl Api {
     }
 
     pub async fn list(&self) -> Result<Vec<Account>, Error> {
-        Ok(
-            serde_json::from_value(self.inner.get_json("./bus/accounts", None).await?)
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )
+        Ok(self
+            .inner
+            .send_api_request(&list_req())
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn get_or_add_account(
@@ -27,13 +31,10 @@ impl Api {
         account_id: &PublicKey,
         host_key: &PublicKey,
     ) -> Result<Account, Error> {
-        let url = format!("./bus/account/{}", account_id);
-        let req = add_req(host_key)?;
         Ok(self
             .inner
-            .send_api_request(&url, &req, false)
+            .send_api_request(&add_req(account_id, host_key)?)
             .await?
-            .expect("send_api_request should return a response")
             .json()
             .await?)
     }
@@ -45,26 +46,14 @@ impl Api {
         exclusive: bool,
         duration: Duration,
     ) -> Result<(Account, u64), Error> {
-        let url = format!("./bus/account/{}/lock", account_id);
-        let req = lock_req(host_key, exclusive, duration)?;
-        let resp: LockResponse = self
-            .inner
-            .send_api_request(&url, &req, false)
-            .await?
-            .expect("send_api_request should return a response")
-            .json()
-            .await?;
+        let req = lock_req(account_id, host_key, exclusive, duration)?;
+        let resp: LockResponse = self.inner.send_api_request(&req).await?.json().await?;
         Ok((resp.account, resp.lock_id))
     }
 
     pub async fn unlock(&self, account_id: &PublicKey, lock_id: u64) -> Result<(), Error> {
-        let url = format!("./bus/account/{}/unlock", account_id);
-        let req = unlock_req(lock_id)?;
-        let _ = self
-            .inner
-            .send_api_request(&url, &req, false)
-            .await?
-            .expect("send_api_request should return a response");
+        let req = unlock_req(account_id, lock_id)?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
@@ -74,9 +63,8 @@ impl Api {
         host_key: &PublicKey,
         amount: u128,
     ) -> Result<(), Error> {
-        let url = format!("./bus/account/{}/add", account_id);
-        let req = add_balance_req(host_key, amount)?;
-        let _ = self.inner.send_api_request(&url, &req, false).await?;
+        let req = add_balance_req(account_id, host_key, amount)?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
@@ -86,9 +74,8 @@ impl Api {
         host_key: &PublicKey,
         amount: u128,
     ) -> Result<(), Error> {
-        let url = format!("./bus/account/{}/update", account_id);
-        let req = update_balance_req(host_key, amount)?;
-        let _ = self.inner.send_api_request(&url, &req, false).await?;
+        let req = update_balance_req(account_id, host_key, amount)?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
@@ -97,9 +84,8 @@ impl Api {
         account_id: &PublicKey,
         host_key: &PublicKey,
     ) -> Result<(), Error> {
-        let url = format!("./bus/account/{}/requiressync", account_id);
-        let req = requires_sync_req(host_key)?;
-        let _ = self.inner.send_api_request(&url, &req, false).await?;
+        let req = requires_sync_req(account_id, host_key)?;
+        let _ = self.inner.send_api_request(&req).await?;
         Ok(())
     }
 
@@ -107,20 +93,22 @@ impl Api {
         let url = format!("./bus/account/{}/resetdrift", account_id);
         let _ = self
             .inner
-            .send_api_request(&url, &RequestType::Post(None, None), false)
+            .send_api_request(&ApiRequestBuilder::post(url).build())
             .await?;
         Ok(())
     }
 }
 
-fn add_req(host_key: &PublicKey) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(AddRequest { host_key })
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./bus/accounts").build()
+}
+
+fn add_req(account_id: &PublicKey, host_key: &PublicKey) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(AddRequest { host_key }).map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -129,14 +117,17 @@ struct AddRequest<'a> {
     host_key: &'a PublicKey,
 }
 
-fn update_balance_req(host_key: &PublicKey, amount: u128) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(UpdateBalanceRequest { host_key, amount })
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn update_balance_req(
+    account_id: &PublicKey,
+    host_key: &PublicKey,
+    amount: u128,
+) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}/update", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(UpdateBalanceRequest { host_key, amount })
+            .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -146,14 +137,17 @@ struct UpdateBalanceRequest<'a> {
     amount: u128,
 }
 
-fn add_balance_req(host_key: &PublicKey, amount: u128) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(AddBalanceRequest { host_key, amount })
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn add_balance_req(
+    account_id: &PublicKey,
+    host_key: &PublicKey,
+    amount: u128,
+) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}/add", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(AddBalanceRequest { host_key, amount })
+            .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -163,14 +157,13 @@ struct AddBalanceRequest<'a> {
     amount: u128,
 }
 
-fn requires_sync_req(host_key: &PublicKey) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(RequiresSyncRequest { host_key })
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn requires_sync_req(account_id: &PublicKey, host_key: &PublicKey) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}/requiressync", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(RequiresSyncRequest { host_key })
+            .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -180,21 +173,21 @@ struct RequiresSyncRequest<'a> {
 }
 
 fn lock_req(
+    account_id: &PublicKey,
     host_key: &PublicKey,
     exclusive: bool,
     duration: Duration,
-) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(LockRequest {
-                host_key,
-                exclusive,
-                duration,
-            })
-            .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}/lock", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(LockRequest {
+            host_key,
+            exclusive,
+            duration,
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -214,14 +207,12 @@ struct LockResponse {
     lock_id: u64,
 }
 
-fn unlock_req(lock_id: u64) -> Result<RequestType<'static>, Error> {
-    Ok(RequestType::Post(
-        Some(RequestContent::Json(
-            serde_json::to_value(UnlockRequest { lock_id })
-                .map_err(|e| InvalidDataError(e.into()))?,
-        )),
-        None,
-    ))
+fn unlock_req(account_id: &PublicKey, lock_id: u64) -> Result<ApiRequest, Error> {
+    let url = format!("./bus/account/{}/unlock", account_id);
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(UnlockRequest { lock_id }).map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post(url).content(content).build())
 }
 
 #[derive(Serialize)]
@@ -253,6 +244,12 @@ mod tests {
 
     #[test]
     fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./bus/accounts");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         [
   {
@@ -319,18 +316,19 @@ mod tests {
 }
         "#;
         let expected: Value = serde_json::from_str(&json)?;
-
-        match lock_req(
+        let req = lock_req(
+            &"ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75"
+                .try_into()?,
             &"ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?,
             false,
             Duration::from_millis(1000),
-        )? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        )?;
+
+        assert_eq!(req.path, "./bus/account/ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75/lock");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         let json = r#"
         {
@@ -375,13 +373,15 @@ mod tests {
 }
         "#;
         let expected: Value = serde_json::from_str(&json)?;
-
-        match unlock_req(13874228167312385374)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = unlock_req(
+            &"ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75"
+                .try_into()?,
+            13874228167312385374,
+        )?;
+        assert_eq!(req.path, "./bus/account/ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75/unlock");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }
@@ -398,13 +398,15 @@ mod tests {
         let host_key: PublicKey =
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
-        match requires_sync_req(&host_key)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
-
+        let req = requires_sync_req(
+            &"ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75"
+                .try_into()?,
+            &host_key,
+        )?;
+        assert_eq!(req.path, "./bus/account/ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75/requiressync");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
         Ok(())
     }
 
@@ -420,12 +422,16 @@ mod tests {
         let host_key: PublicKey =
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
-        match add_balance_req(&host_key, 1000000)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = add_balance_req(
+            &"ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75"
+                .try_into()?,
+            &host_key,
+            1000000,
+        )?;
+        assert_eq!(req.path, "./bus/account/ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75/add");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }
@@ -442,12 +448,16 @@ mod tests {
         let host_key: PublicKey =
             "ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?;
-        match update_balance_req(&host_key, 22221111)? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        let req = update_balance_req(
+            &"ed25519:ee51dac3daae45b63179b7a325443354489d4434f64652bbc30d7e1a3bd8003e"
+                .try_into()?,
+            &host_key,
+            22221111,
+        )?;
+        assert_eq!(req.path, "./bus/account/ed25519:ee51dac3daae45b63179b7a325443354489d4434f64652bbc30d7e1a3bd8003e/update");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         Ok(())
     }
@@ -461,15 +471,16 @@ mod tests {
         "#;
         let expected: Value = serde_json::from_str(&json)?;
 
-        match add_req(
+        let req = add_req(
+            &"ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75"
+                .try_into()?,
             &"ed25519:0c920d0254011f1065eeb99aa909c644b991780c1155ce0aa34cce09e6eabdc9"
                 .try_into()?,
-        )? {
-            RequestType::Post(Some(RequestContent::Json(json)), None) => {
-                assert_eq!(json, expected)
-            }
-            _ => panic!("invalid request"),
-        }
+        )?;
+        assert_eq!(req.path, "./bus/account/ed25519:99611c808ccb74402f0c80ea0b22cefe3b46a73abe1072c90687658d44dead75");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
 
         let json = r#"
         {
