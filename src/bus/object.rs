@@ -1,7 +1,8 @@
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
+use crate::Error::InvalidDataError;
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -37,6 +38,135 @@ impl Api {
             None => Ok((None, None, false)),
         }
     }
+
+    //todo: implement PUT /objects/*key function
+
+    pub async fn delete<S: AsRef<str>>(
+        &self,
+        path: S,
+        bucket: Option<String>,
+        batch: bool,
+    ) -> Result<(), Error> {
+        let _ = self
+            .inner
+            .send_api_request(&delete_req(path, bucket, batch))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn copy(
+        &self,
+        source_path: String,
+        source_bucket: String,
+        destination_path: String,
+        destination_bucket: String,
+    ) -> Result<(), Error> {
+        let _ = self
+            .inner
+            .send_api_request(&copy_req(
+                source_path,
+                source_bucket,
+                destination_path,
+                destination_bucket,
+            )?)
+            .await?;
+        //todo: check if renterd actually responds with content here contrary to the docs
+        Ok(())
+    }
+
+    pub async fn rename(
+        &self,
+        from: String,
+        to: String,
+        bucket: String,
+        force: bool,
+        mode: RenameMode,
+    ) -> Result<(), Error> {
+        let _ = self
+            .inner
+            .send_api_request(&rename_req(from, to, bucket, force, mode)?)
+            .await?;
+        Ok(())
+    }
+}
+
+fn rename_req(
+    from: String,
+    to: String,
+    bucket: String,
+    force: bool,
+    mode: RenameMode,
+) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(RenameRequest {
+            bucket,
+            force,
+            from,
+            to,
+            mode,
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post("./bus/objects/rename")
+        .content(content)
+        .build())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenameRequest {
+    bucket: String,
+    force: bool,
+    from: String,
+    to: String,
+    mode: RenameMode,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RenameMode {
+    Single,
+    Multi,
+}
+
+fn copy_req(
+    source_path: String,
+    source_bucket: String,
+    destination_path: String,
+    destination_bucket: String,
+) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(CopyRequest {
+            source_bucket,
+            source_path,
+            destination_bucket,
+            destination_path,
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post("./bus/objects/copy")
+        .content(content)
+        .build())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CopyRequest {
+    source_bucket: String,
+    source_path: String,
+    destination_bucket: String,
+    destination_path: String,
+    //todo: clarify use of `mimeType` and `metadata` fields
+}
+
+fn delete_req<S: AsRef<str>>(path: S, bucket: Option<String>, batch: bool) -> ApiRequest {
+    let url = encode_path(path);
+    let mut params = Vec::with_capacity(2);
+    if let Some(bucket) = bucket {
+        params.push(("bucket", bucket))
+    };
+    params.push(("batch", batch.to_string()));
+    ApiRequestBuilder::delete(url).params(Some(params)).build()
 }
 
 fn list_req<S: AsRef<str>>(
@@ -96,21 +226,38 @@ pub struct Object {
 }
 
 fn encode_path<S: AsRef<str>>(path: S) -> String {
-    format!(
+    //todo: find out how renterd actually expects the path to be encoded
+    /*format!(
         "./bus/objects/{}",
         urlencoding::encode(path.as_ref().trim_start_matches('/'))
-    )
+    )*/
+    format!("./bus/objects/{}", path.as_ref().trim_start_matches('/'))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
     use std::str::FromStr;
 
-    //todo: test list_req
-
     #[test]
-    fn deserialize_list_dir() -> anyhow::Result<()> {
+    fn list_dir() -> anyhow::Result<()> {
+        let req = list_req(
+            "/foo/",
+            Some("foo_bucket".to_string()),
+            None,
+            None,
+            None,
+            None,
+        );
+        assert_eq!(req.path, "./bus/objects/foo/");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(
+            req.params,
+            Some(vec![("bucket".into(), "foo_bucket".into())])
+        );
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
 	"hasMore": false,
@@ -141,7 +288,10 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_list_file() -> anyhow::Result<()> {
+    fn list_file() -> anyhow::Result<()> {
+        let req = list_req("/foo/This is a file.zip", None, None, None, None, None);
+        assert_eq!(req.path, "./bus/objects/foo/This is a file.zip");
+
         let json = r#"
         {
 	"hasMore": false,
@@ -179,6 +329,74 @@ mod tests {
         assert_eq!(object.metadata.health, BigDecimal::from_str("1")?);
 
         //todo: test slabs
+        Ok(())
+    }
+
+    #[test]
+    fn delete() -> anyhow::Result<()> {
+        let req = delete_req("/foo/bar/file.ext", Some("bucket_name".to_string()), false);
+        assert_eq!(req.path, "./bus/objects/foo/bar/file.ext");
+        assert_eq!(req.request_type, RequestType::Delete);
+        assert_eq!(
+            req.params,
+            Some(vec![
+                ("bucket".into(), "bucket_name".into()),
+                ("batch".into(), "false".into())
+            ])
+        );
+        assert_eq!(req.content, None);
+        Ok(())
+    }
+
+    #[test]
+    fn copy() -> anyhow::Result<()> {
+        let json = r#"
+        {
+    "sourceBucket": "default",
+    "sourcePath": "/foo/bar/file1",
+    "destinationBucket": "default",
+    "destinationPath": "/foo/bar/file2"
+}
+        "#;
+        let expected: Value = serde_json::from_str(&json)?;
+
+        let req = copy_req(
+            "/foo/bar/file1".to_string(),
+            "default".to_string(),
+            "/foo/bar/file2".to_string(),
+            "default".to_string(),
+        )?;
+        assert_eq!(req.path, "./bus/objects/copy");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
+        Ok(())
+    }
+
+    #[test]
+    fn rename() -> anyhow::Result<()> {
+        let json = r#"
+        {
+    "bucket": "mybucket",
+    "from": "/foo/old",
+    "to": "/foo/new",
+    "mode": "single",
+    "force": false
+}
+        "#;
+        let expected: Value = serde_json::from_str(&json)?;
+
+        let req = rename_req(
+            "/foo/old".to_string(),
+            "/foo/new".to_string(),
+            "mybucket".to_string(),
+            false,
+            RenameMode::Single,
+        )?;
+        assert_eq!(req.path, "./bus/objects/rename");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
         Ok(())
     }
 }
