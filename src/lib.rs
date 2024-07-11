@@ -525,6 +525,15 @@ impl<'de> Deserialize<'de> for FileContractId {
     }
 }
 
+impl Serialize for FileContractId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
 impl<'de> Visitor<'de> for FileContractIdVisitor {
     type Value = FileContractId;
 
