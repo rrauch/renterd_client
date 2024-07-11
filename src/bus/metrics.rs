@@ -367,7 +367,7 @@ pub mod contract_set {
 }
 
 pub mod contract_prune {
-    use crate::{ApiRequest, ClientInner, Error, FileContractId, PublicKey};
+    use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, FileContractId, PublicKey};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
     use std::sync::Arc;
@@ -406,6 +406,17 @@ pub mod contract_prune {
                 .json()
                 .await?)
         }
+
+        pub async fn delete(&self, cutoff: &DateTime<FixedOffset>) -> Result<(), Error> {
+            let _ = self.inner.send_api_request(&delete_req(cutoff)).await?;
+            Ok(())
+        }
+    }
+
+    fn delete_req(cutoff: &DateTime<FixedOffset>) -> ApiRequest {
+        ApiRequestBuilder::delete("./bus/metric/contractprune")
+            .params(Some(vec![("cutoff", cutoff.to_rfc3339())]))
+            .build()
     }
 
     fn list_req(
@@ -446,7 +457,26 @@ pub mod contract_prune {
         pub duration: Duration,
     }
 
-    //todo: add tests when we have some test data
+    #[cfg(test)]
+    mod tests {
+        use crate::bus::metrics::contract_prune::delete_req;
+        use crate::RequestType;
+        use chrono::DateTime;
+        //todo: add more tests when test data becomes available
+
+        #[test]
+        fn delete() -> anyhow::Result<()> {
+            let req = delete_req(&DateTime::parse_from_rfc3339("2024-01-22T14:22:30+00:00")?);
+            assert_eq!(req.path, "./bus/metric/contractprune");
+            assert_eq!(req.request_type, RequestType::Delete);
+            assert_eq!(
+                req.params,
+                Some(vec![("cutoff".into(), "2024-01-22T14:22:30+00:00".into())])
+            );
+            assert_eq!(req.content, None);
+            Ok(())
+        }
+    }
 }
 
 pub mod wallet {
