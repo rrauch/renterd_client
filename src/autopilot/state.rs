@@ -1,4 +1,4 @@
-use crate::{ApiRequestBuilder, ClientInner, Error};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -17,11 +17,15 @@ impl Api {
     pub async fn list(&self) -> Result<State, Error> {
         Ok(self
             .inner
-            .send_api_request(&ApiRequestBuilder::get("./autopilot/state").build())
+            .send_api_request(&list_req())
             .await?
             .json()
             .await?)
     }
+}
+
+fn list_req() -> ApiRequest {
+    ApiRequestBuilder::get("./autopilot/state").build()
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -44,10 +48,17 @@ pub struct State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
     use chrono::DateTime;
 
     #[test]
-    fn deserialize_list() -> anyhow::Result<()> {
+    fn list() -> anyhow::Result<()> {
+        let req = list_req();
+        assert_eq!(req.path, "./autopilot/state");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, None);
+
         let json = r#"
         {
   "configured": true,
