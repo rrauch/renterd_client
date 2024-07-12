@@ -1,4 +1,5 @@
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error};
+use crate::Error::InvalidDataError;
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -20,6 +21,11 @@ impl Api {
             .await?)
     }
 
+    pub async fn connect<S: AsRef<str>>(&self, address: S) -> Result<(), Error> {
+        let _ = self.inner.send_api_request(&connect_req(address)?).await?;
+        Ok(())
+    }
+
     pub async fn peers(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .inner
@@ -38,10 +44,19 @@ fn peers_req() -> ApiRequest {
     ApiRequestBuilder::get("./bus/syncer/peers").build()
 }
 
+fn connect_req<S: AsRef<str>>(address: S) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(address.as_ref()).map_err(|e| InvalidDataError(e.into()))?,
+    ));
+    Ok(ApiRequestBuilder::post("./bus/syncer/connect")
+        .content(content)
+        .build())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::bus::syncer::{address_req, peers_req};
-    use crate::RequestType;
+    use crate::bus::syncer::{address_req, connect_req, peers_req};
+    use crate::{RequestContent, RequestType};
 
     #[test]
     fn address() -> anyhow::Result<()> {
@@ -55,6 +70,21 @@ mod tests {
         "127.102.123.11:9881""#;
         let address: String = serde_json::from_str(&json)?;
         assert_eq!(address, "127.102.123.11:9881");
+        Ok(())
+    }
+
+    #[test]
+    fn connect() -> anyhow::Result<()> {
+        let json = r#"
+           "78.197.237.216:9981"
+            "#;
+        let expected = serde_json::from_str(json)?;
+
+        let req = connect_req(&"78.197.237.216:9981")?;
+        assert_eq!(req.path, "./bus/syncer/connect");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
         Ok(())
     }
 
