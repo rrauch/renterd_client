@@ -5,7 +5,7 @@ use bandwidth::Bandwidth;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, FixedOffset};
 use reqwest::{Client as ReqwestClient, Response};
-use serde::de::{MapAccess, Visitor};
+use serde::de::{IntoDeserializer, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -720,46 +720,28 @@ impl<'de> Visitor<'de> for SettingsIdVisitor {
     }
 }
 
-fn deserialize_option_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
 where
-    D: Deserializer<'de>,
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
 {
-    struct StringVisitor;
-
-    impl<'de> Visitor<'de> for StringVisitor {
-        type Value = Option<String>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string or null")
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Option<String>, E>
-        where
-            E: serde::de::Error,
-        {
-            if value.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(value.to_owned()))
-            }
-        }
-
-        fn visit_none<E>(self) -> Result<Option<String>, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_some<D>(self, deserializer: D) -> Result<Option<String>, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_str(self)
-        }
+    let opt = Option::<String>::deserialize(de)?;
+    let opt = opt.as_ref().map(String::as_str);
+    match opt {
+        None | Some("") => Ok(None),
+        Some(s) => T::deserialize(s.into_deserializer()).map(Some),
     }
+}
 
-    deserializer.deserialize_option(StringVisitor)
+fn none_as_empty_string<'de, S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    match value {
+        None => serializer.serialize_str(""),
+        Some(value) => value.serialize(serializer),
+    }
 }
 
 fn deserialize_mbps_float<'de, D>(deserializer: D) -> Result<Bandwidth, D::Error>

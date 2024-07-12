@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{deserialize_option_string, ApiRequest, ApiRequestBuilder, RequestContent};
+use crate::{empty_string_as_none, ApiRequest, ApiRequestBuilder, RequestContent};
 use crate::{ClientInner, Error, PublicKey, SettingsId};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
@@ -463,19 +463,19 @@ pub struct Check {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct GougingBreakdown {
     #[serde(rename = "contractErr")]
-    #[serde(deserialize_with = "deserialize_option_string")]
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub contract_error: Option<String>,
     #[serde(rename = "downloadErr")]
-    #[serde(deserialize_with = "deserialize_option_string")]
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub download_error: Option<String>,
     #[serde(rename = "gougingErr")]
-    #[serde(deserialize_with = "deserialize_option_string")]
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub gouging_error: Option<String>,
     #[serde(rename = "pruneErr")]
-    #[serde(deserialize_with = "deserialize_option_string")]
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub prune_error: Option<String>,
     #[serde(rename = "uploadErr")]
-    #[serde(deserialize_with = "deserialize_option_string")]
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub upload_error: Option<String>,
 }
 

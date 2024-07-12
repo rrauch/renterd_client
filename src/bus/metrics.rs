@@ -226,7 +226,7 @@ pub mod contract {
 }
 
 pub mod churn {
-    use crate::{deserialize_option_string, ApiRequest};
+    use crate::{empty_string_as_none, ApiRequest};
     use crate::{ClientInner, Error, FileContractId};
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::Deserialize;
@@ -299,7 +299,7 @@ pub mod churn {
         #[serde(rename = "contractID")]
         pub contract_id: FileContractId,
         pub name: String,
-        #[serde(deserialize_with = "deserialize_option_string")]
+        #[serde(deserialize_with = "empty_string_as_none")]
         pub reason: Option<String>,
         pub timestamp: DateTime<FixedOffset>,
     }
