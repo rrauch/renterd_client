@@ -74,7 +74,9 @@ fn broadcast_req(event: &Event) -> Result<ApiRequest, Error> {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 struct Response {
+    #[serde(deserialize_with = "crate::deserialize_null_default")]
     webhooks: Vec<Webhook>,
+    #[serde(deserialize_with = "crate::deserialize_null_default")]
     queues: Vec<Queue>,
 }
 
@@ -134,6 +136,16 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);
         assert_eq!(req.content, None);
+
+        let json = r#"
+{
+	"webhooks": null,
+	"queues": null
+}
+        "#;
+        let resp: Response = serde_json::from_str(&json)?;
+        assert_eq!(resp.webhooks.len(), 0);
+        assert_eq!(resp.queues.len(), 0);
 
         let json = r#"
        {
