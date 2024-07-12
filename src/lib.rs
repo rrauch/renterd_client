@@ -820,35 +820,56 @@ pub struct Percentage {
 }
 
 impl Percentage {
-    fn new(value: BigDecimal) -> Self {
+    fn from_whole(value: BigDecimal) -> Self {
         Self { inner: value / 100 }
     }
 
-    pub fn as_big_decimal(&self) -> &BigDecimal {
+    fn from_decimal(value: BigDecimal) -> Self {
+        Self { inner: value }
+    }
+
+    pub fn as_decimal(&self) -> &BigDecimal {
         &self.inner
     }
-}
 
-impl TryFrom<&str> for Percentage {
-    type Error = InvalidDataError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Percentage::new(BigDecimal::from_str(value).map_err(
-            |_| InvalidDataError::InvalidPercentage(value.to_string()),
-        )?))
+    pub fn to_whole(&self) -> BigDecimal {
+        &self.inner * 100
     }
 }
 
-impl<'de> Deserialize<'de> for Percentage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(PercentageVisitor)
+impl Display for Percentage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{}%", self.to_whole().normalized()))
     }
 }
 
-struct PercentageVisitor;
+fn deserialize_percentage_from_whole<'de, D>(deserializer: D) -> Result<Percentage, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(PercentageVisitor { from_whole: true })
+}
+
+fn deserialize_percentage_from_decimal<'de, D>(deserializer: D) -> Result<Percentage, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(PercentageVisitor { from_whole: false })
+}
+
+struct PercentageVisitor {
+    from_whole: bool,
+}
+
+impl PercentageVisitor {
+    fn to_percentage(&self, value: BigDecimal) -> Percentage {
+        if self.from_whole {
+            Percentage::from_whole(value)
+        } else {
+            Percentage::from_decimal(value)
+        }
+    }
+}
 
 impl<'de> Visitor<'de> for PercentageVisitor {
     type Value = Percentage;
@@ -857,25 +878,30 @@ impl<'de> Visitor<'de> for PercentageVisitor {
         formatter.write_str("a number")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    fn visit_str<E>(mut self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(v.try_into().map_err(|e| serde::de::Error::custom(e))?)
+        if v.ends_with('%') {
+            // always treat it as a "whole" value
+            self.from_whole = true;
+        }
+        let v = v.trim_end_matches('%');
+        Ok(self.to_percentage(BigDecimal::from_str(v).map_err(|e| serde::de::Error::custom(e))?))
     }
 
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(Percentage::new(BigDecimal::from(v)))
+        Ok(self.to_percentage(BigDecimal::from(v)))
     }
 
     fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(Percentage::new(
+        Ok(self.to_percentage(
             BigDecimal::from_f64(v).ok_or(serde::de::Error::custom("failed to parse f64"))?,
         ))
     }
@@ -885,7 +911,7 @@ impl<'de> Visitor<'de> for PercentageVisitor {
         A: MapAccess<'de>,
     {
         match BigDecimal::from_str(map.next_value::<String>()?.as_str()) {
-            Ok(bd) => Ok(Percentage::new(bd)),
+            Ok(bd) => Ok(self.to_percentage(bd)),
             Err(_) => Err(serde::de::Error::custom("Invalid number")),
         }
     }
@@ -1009,24 +1035,34 @@ mod tests {
     fn percentage_deserialization() -> anyhow::Result<()> {
         #[derive(Deserialize)]
         struct Test {
+            #[serde(deserialize_with = "crate::deserialize_percentage_from_whole")]
             p1: Percentage,
+            #[serde(deserialize_with = "crate::deserialize_percentage_from_decimal")]
             p2: Percentage,
+            #[serde(deserialize_with = "crate::deserialize_percentage_from_whole")]
             p3: Percentage,
+            #[serde(deserialize_with = "crate::deserialize_percentage_from_decimal")]
             p4: Percentage,
+            #[serde(deserialize_with = "crate::deserialize_percentage_from_decimal")]
+            p5: Percentage,
         }
 
         let json = r#"{
          "p1": 0,
-         "p2": 2,
+         "p2": 0.2,
          "p3": 123,
-         "p4": 10.25
+         "p4": 1.25,
+         "p5": "25%"
         }
         "#;
         let test: Test = serde_json::from_str(&json)?;
-        assert!(test.p1.as_big_decimal().is_zero());
-        assert_eq!(test.p2.as_big_decimal(), &BigDecimal::from_str("0.02")?);
-        assert_eq!(test.p3.as_big_decimal(), &BigDecimal::from_str("1.23")?);
-        assert_eq!(test.p4.as_big_decimal(), &BigDecimal::from_str("0.1025")?);
+        assert!(test.p1.as_decimal().is_zero());
+        assert_eq!(test.p2.as_decimal(), &BigDecimal::from_str("0.2")?);
+        assert_eq!(test.p3.as_decimal(), &BigDecimal::from_str("1.23")?);
+        assert_eq!(test.p4.as_decimal(), &BigDecimal::from_str("1.25")?);
+        assert_eq!(test.p5.as_decimal(), &BigDecimal::from_str("0.25")?);
+
+        assert_eq!(test.p2.to_string(), "20%");
         Ok(())
     }
 }

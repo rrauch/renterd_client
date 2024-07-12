@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Percentage, RequestContent};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
@@ -206,8 +206,8 @@ struct ListResponse {
 pub struct Metadata {
     #[serde(rename = "eTag")]
     pub etag: Option<String>,
-    #[serde(with = "bigdecimal::serde::json_num")]
-    pub health: BigDecimal,
+    #[serde(deserialize_with = "crate::deserialize_percentage_from_decimal")]
+    pub health: Percentage,
     pub mod_time: DateTime<FixedOffset>,
     pub name: String,
     pub size: u64,
@@ -264,7 +264,7 @@ mod tests {
 	"entries": [
 		{
 			"eTag": "d41d8cd98f00b204e9800998ecf8427e",
-			"health": 1,
+			"health": 1.2,
 			"modTime": "2024-07-05T12:37:58.998523074Z",
 			"name": "/foo/",
 			"size": 5586849,
@@ -282,6 +282,10 @@ mod tests {
         assert_eq!(
             entries.get(0).unwrap().mod_time,
             DateTime::parse_from_rfc3339("2024-07-05T12:37:58.998523074Z")?
+        );
+        assert_eq!(
+            entries.get(0).unwrap().health.as_decimal(),
+            &BigDecimal::from_str("1.2")?,
         );
         assert_eq!(entries.get(0).unwrap().size, 5586849);
         Ok(())
@@ -326,7 +330,10 @@ mod tests {
             object.metadata.etag,
             Some("322fc5d8660ed6b05e60aa17b08897c149841991ce8070c83c84eb00b39bcdd9".to_string())
         );
-        assert_eq!(object.metadata.health, BigDecimal::from_str("1")?);
+        assert_eq!(
+            object.metadata.health.as_decimal(),
+            &BigDecimal::from_str("1")?
+        );
 
         //todo: test slabs
         Ok(())

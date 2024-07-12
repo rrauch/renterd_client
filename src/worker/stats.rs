@@ -47,6 +47,7 @@ pub struct Download {
     #[serde(deserialize_with = "crate::deserialize_mbps_float")]
     pub avg_download_speed: Bandwidth,
     #[serde(rename = "avgOverdrivePct")]
+    #[serde(deserialize_with = "crate::deserialize_percentage_from_whole")]
     pub avg_overdrive: Percentage,
     pub healthy_downloaders: u64,
     pub num_downloaders: u64,
@@ -71,6 +72,7 @@ pub struct Upload {
     #[serde(deserialize_with = "crate::deserialize_mbps_float")]
     pub avg_upload_speed: Bandwidth,
     #[serde(rename = "avgOverdrivePct")]
+    #[serde(deserialize_with = "crate::deserialize_percentage_from_whole")]
     pub avg_overdrive: Percentage,
     pub healthy_uploaders: u64,
     pub num_uploaders: u64,
@@ -145,7 +147,7 @@ mod tests {
             Bandwidth::from_gbps_f64(0.27789)
         );
         assert_eq!(
-            download.avg_overdrive.as_big_decimal(),
+            download.avg_overdrive.as_decimal(),
             &BigDecimal::from_str("0.02")?
         );
         assert_eq!(download.healthy_downloaders, 5);
@@ -213,7 +215,7 @@ mod tests {
         let upload: Upload = serde_json::from_str(&json)?;
         assert_eq!(upload.avg_upload_speed, Bandwidth::from_gbps_f64(0.01505));
         assert_eq!(
-            upload.avg_overdrive.as_big_decimal(),
+            upload.avg_overdrive.as_decimal(),
             &BigDecimal::from_str("0.4709")?
         );
         assert_eq!(upload.healthy_uploaders, 5);
