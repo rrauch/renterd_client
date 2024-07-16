@@ -93,6 +93,10 @@ impl ApiRequestBuilder {
         Self::new(path, RequestType::Delete)
     }
 
+    pub(crate) fn head<T: Into<Cow<'static, str>>>(path: T) -> Self {
+        Self::new(path, RequestType::Head)
+    }
+
     pub(crate) fn params<K: Into<Cow<'static, str>>, V: Into<Cow<'static, str>>>(
         mut self,
         params: Option<Vec<(K, V)>>,
@@ -118,6 +122,7 @@ enum RequestType {
     Post,
     Put,
     Delete,
+    Head,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -126,18 +131,10 @@ enum RequestContent {
 }
 
 impl ClientInner {
-    async fn send_api_request(&self, request: &ApiRequest) -> Result<Response, crate::Error> {
-        match self.send_api_request_optional(request).await {
-            Ok(Some(resp)) => Ok(resp),
-            Ok(None) => Err(Error::NotFoundError),
-            Err(e) => Err(e),
-        }
-    }
-
-    async fn send_api_request_optional(
+    async fn api_request_builder(
         &self,
         request: &ApiRequest,
-    ) -> Result<Option<Response>, Error> {
+    ) -> Result<reqwest::RequestBuilder, crate::Error> {
         let url = self
             .api_endpoint_url
             .join(request.path.as_ref())
@@ -148,6 +145,7 @@ impl ClientInner {
             RequestType::Post => self.reqwest_client.post(url),
             RequestType::Put => self.reqwest_client.put(url),
             RequestType::Delete => self.reqwest_client.delete(url),
+            RequestType::Head => self.reqwest_client.head(url),
         };
 
         if let Some(params) = &request.params {
@@ -160,10 +158,22 @@ impl ClientInner {
             }
         }
 
-        let req = request_builder
-            .basic_auth("api", Some(&self.api_password))
-            .build()?;
+        Ok(request_builder.basic_auth("api", Some(&self.api_password)))
+    }
 
+    async fn send_api_request(&self, request: &ApiRequest) -> Result<Response, crate::Error> {
+        match self.send_api_request_optional(request).await {
+            Ok(Some(resp)) => Ok(resp),
+            Ok(None) => Err(Error::NotFoundError),
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn send_api_request_optional(
+        &self,
+        request: &ApiRequest,
+    ) -> Result<Option<Response>, Error> {
+        let req = self.api_request_builder(request).await?.build()?;
         let resp = self.reqwest_client.execute(req).await?;
 
         if resp.status().as_u16() == 401 {
@@ -200,8 +210,14 @@ pub enum Error {
     AuthenticationError,
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
     #[error("server sent 404 not found")]
     NotFoundError,
+    #[error("the resource at `{0}` is not a downloadable object")]
+    NotDownloadableObject(String),
+    #[error("the object at `{0}` is not seekable")]
+    NotSeekable(String),
 }
 
 #[derive(Error, Debug)]
@@ -224,6 +240,10 @@ pub enum InvalidDataError {
     InvalidSettingsId(String),
     #[error("invalid percentage {0}")]
     InvalidPercentage(String),
+    #[error("invalid last modified date header")]
+    InvalidLastModified,
+    #[error("invalid content length header")]
+    InvalidContentLength,
 }
 
 pub struct ClientBuilder {
@@ -324,6 +344,19 @@ impl ClientBuilder {
             worker: Worker::new(inner),
         })
     }
+}
+
+fn encode_object_path<S: AsRef<str>>(path: S, prefix: &'static str) -> String {
+    //todo: find out how renterd actually expects the path to be encoded
+    /*format!(
+        "./bus/objects/{}",
+        urlencoding::encode(path.as_ref().trim_start_matches('/'))
+    )*/
+    format!(
+        "{}/{}",
+        prefix,
+        path.as_ref().trim_start_matches('/')
+    )
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]

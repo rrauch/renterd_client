@@ -15,6 +15,9 @@ hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
 bandwidth = "0.3"
+reqwest-file = { path = "vendor/reqwest-file" }
+futures = "0.3"
+tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 
 [dev-dependencies]
 anyhow = "1.0"

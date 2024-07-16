@@ -1,0 +1,27 @@
+[package]
+name = "reqwest-file"
+version = "0.2.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Alexander van Ratingen"]
+homepage = "https://github.com/alvra/reqwest-file"
+repository = "https://github.com/alvra/reqwest-file"
+documentation = "https://docs.rs/reqwest-file"
+description = "Use web resources like regular async files"
+readme = "README.md"
+keywords = ["http", "request", "async"]
+
+[dependencies]
+bytes = "1.6"
+pin-project = "1.0.10"
+futures-util = "0.3.21"
+tokio = { version = "1.38", default-features = false }
+tokio-util = { version = "0.7", default-features = false, features = ["io"] }
+reqwest = { version = "0.12", default-features = false, features = ["stream"] }
+
+[dev-dependencies]
+paste = "1.0"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+tokio = { version = "1.38", features = ["rt", "macros"] }
+tokio-test = "0.4.2"
+axum = { version = "0.5.16", default-features = false, features = ["headers", "query"] }

@@ -1,5 +1,8 @@
 use crate::Error::InvalidDataError;
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Percentage, RequestContent};
+use crate::{
+    encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error, Percentage,
+    RequestContent,
+};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
@@ -160,7 +163,7 @@ struct CopyRequest {
 }
 
 fn delete_req<S: AsRef<str>>(path: S, bucket: Option<String>, batch: bool) -> ApiRequest {
-    let url = encode_path(path);
+    let url = encode_object_path(path, "./bus/objects");
     let mut params = Vec::with_capacity(2);
     if let Some(bucket) = bucket {
         params.push(("bucket", bucket))
@@ -177,7 +180,7 @@ fn list_req<S: AsRef<str>>(
     marker: Option<String>,
     limit: Option<usize>,
 ) -> ApiRequest {
-    let path = encode_path(path);
+    let path = encode_object_path(path, "./bus/objects");
     let params: Vec<_> = [
         bucket.map(|b| ("bucket", b)),
         prefix.map(|p| ("prefix", p)),
@@ -223,15 +226,6 @@ pub struct Object {
     pub slabs: Option<Vec<Value>>, //todo: implement Slab types
     #[serde(flatten)]
     pub metadata: Metadata,
-}
-
-fn encode_path<S: AsRef<str>>(path: S) -> String {
-    //todo: find out how renterd actually expects the path to be encoded
-    /*format!(
-        "./bus/objects/{}",
-        urlencoding::encode(path.as_ref().trim_start_matches('/'))
-    )*/
-    format!("./bus/objects/{}", path.as_ref().trim_start_matches('/'))
 }
 
 #[cfg(test)]

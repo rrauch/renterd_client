@@ -1,8 +1,10 @@
 pub mod memory;
+pub mod r#object;
 pub mod state;
 pub mod stats;
 
 use crate::worker::memory::Api as MemoryApi;
+use crate::worker::object::Api as ObjectApi;
 use crate::worker::state::Api as StateApi;
 use crate::worker::stats::Api as StatsApi;
 use crate::{ApiRequestBuilder, ClientInner, Error};
@@ -14,6 +16,7 @@ pub struct Worker {
     memory: MemoryApi,
     state: StateApi,
     stats: StatsApi,
+    object: ObjectApi,
 }
 
 impl Worker {
@@ -23,6 +26,7 @@ impl Worker {
             memory: MemoryApi::new(inner.clone()),
             state: StateApi::new(inner.clone()),
             stats: StatsApi::new(inner.clone()),
+            object: ObjectApi::new(inner.clone()),
         }
     }
 
@@ -45,5 +49,9 @@ impl Worker {
 
     pub fn stats(&self) -> &StatsApi {
         &self.stats
+    }
+
+    pub fn object(&self) -> &ObjectApi {
+        &self.object
     }
 }
