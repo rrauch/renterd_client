@@ -19,14 +19,14 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(
+    pub async fn get_all(
         &self,
         offset: Option<NonZeroUsize>,
         limit: Option<NonZeroUsize>,
     ) -> Result<Vec<Host>, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req(offset, limit))
+            .send_api_request(&get_all_req(offset, limit))
             .await?
             .json()
             .await?)
@@ -247,7 +247,7 @@ fn allowlist_req() -> ApiRequest {
     ApiRequestBuilder::get("./bus/hosts/allowlist").build()
 }
 
-fn list_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
+fn get_all_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
     let mut params = Vec::with_capacity(2);
     if let Some(offset) = offset {
         params.push(("offset", offset.to_string()));
@@ -519,17 +519,17 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req(None, None);
+    fn get_all() -> anyhow::Result<()> {
+        let req = get_all_req(None, None);
         assert_eq!(req.path, "./bus/hosts");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);
         assert_eq!(req.content, None);
 
-        let req = list_req(Some(10.try_into()?), None);
+        let req = get_all_req(Some(10.try_into()?), None);
         assert_eq!(req.params, Some(vec![("offset".into(), "10".into())]));
 
-        let req = list_req(Some(10.try_into()?), Some(20.try_into()?));
+        let req = get_all_req(Some(10.try_into()?), Some(20.try_into()?));
         assert_eq!(
             req.params,
             Some(vec![

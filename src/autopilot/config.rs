@@ -14,10 +14,10 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<AutopilotConfig, Error> {
+    pub async fn get(&self) -> Result<AutopilotConfig, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req())
+            .send_api_request(&get_req())
             .await?
             .json()
             .await?)
@@ -32,11 +32,9 @@ impl Api {
     }
 
     //todo: config evaluation
-
-
 }
 
-fn list_req() -> ApiRequest {
+fn get_req() -> ApiRequest {
     ApiRequestBuilder::get("./autopilot/config").build()
 }
 
@@ -91,8 +89,8 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req();
+    fn get() -> anyhow::Result<()> {
+        let req = get_req();
         assert_eq!(req.path, "./autopilot/config");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);

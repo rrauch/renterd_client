@@ -31,7 +31,7 @@ use crate::bus::syncer::Api as SyncerApi;
 use crate::bus::txpool::Api as TxpoolApi;
 use crate::bus::wallet::Api as WalletApi;
 use crate::bus::webhook::Api as WebhookApi;
-use crate::ClientInner;
+use crate::{ClientInner, Error};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -116,8 +116,8 @@ impl Bus {
         &self.setting
     }
 
-    pub fn state(&self) -> &StateApi {
-        &self.state
+    pub async fn state(&self) -> Result<state::State, Error> {
+        self.state.get().await
     }
 
     pub fn stats(&self) -> &StatsApi {

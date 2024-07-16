@@ -16,10 +16,10 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<Vec<Autopilot>, Error> {
+    pub async fn get_all(&self) -> Result<Vec<Autopilot>, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req())
+            .send_api_request(&get_all_req())
             .await?
             .json()
             .await?)
@@ -60,7 +60,7 @@ fn check_host_req<S: AsRef<str>>(id: S, host_key: &PublicKey) -> ApiRequest {
     .build()
 }
 
-fn list_req() -> ApiRequest {
+fn get_all_req() -> ApiRequest {
     ApiRequestBuilder::get("./bus/autopilots").build()
 }
 
@@ -91,8 +91,8 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req();
+    fn get_all() -> anyhow::Result<()> {
+        let req = get_all_req();
         assert_eq!(req.path, "./bus/autopilots");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);

@@ -12,17 +12,17 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<Memory, Error> {
+    pub(super) async fn get(&self) -> Result<Memory, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req())
+            .send_api_request(&get_req())
             .await?
             .json()
             .await?)
     }
 }
 
-fn list_req() -> ApiRequest {
+fn get_req() -> ApiRequest {
     ApiRequestBuilder::get("./worker/memory").build()
 }
 
@@ -46,8 +46,8 @@ mod tests {
     use crate::RequestType;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req();
+    fn get() -> anyhow::Result<()> {
+        let req = get_req();
         assert_eq!(req.path, "./worker/memory");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);

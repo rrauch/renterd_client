@@ -20,7 +20,7 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list<S: AsRef<str>>(
+    pub async fn get<S: AsRef<str>>(
         &self,
         path: S,
         bucket: Option<String>,
@@ -31,11 +31,11 @@ impl Api {
     ) -> Result<(Option<Object>, Option<Vec<Metadata>>, bool), Error> {
         match self
             .inner
-            .send_api_request_optional(&list_req(path, bucket, prefix, offset, marker, limit))
+            .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
             .await?
         {
             Some(resp) => {
-                let response: ListResponse = resp.json().await?;
+                let response: GetResponse = resp.json().await?;
                 Ok((response.object, response.entries, response.has_more))
             }
             None => Ok((None, None, false)),
@@ -172,7 +172,7 @@ fn delete_req<S: AsRef<str>>(path: S, bucket: Option<String>, batch: bool) -> Ap
     ApiRequestBuilder::delete(url).params(Some(params)).build()
 }
 
-fn list_req<S: AsRef<str>>(
+fn get_req<S: AsRef<str>>(
     path: S,
     bucket: Option<String>,
     prefix: Option<String>,
@@ -198,7 +198,7 @@ fn list_req<S: AsRef<str>>(
 
 #[derive(Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-struct ListResponse {
+struct GetResponse {
     entries: Option<Vec<Metadata>>,
     object: Option<Object>,
     has_more: bool,
@@ -235,8 +235,8 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn list_dir() -> anyhow::Result<()> {
-        let req = list_req(
+    fn get_dir() -> anyhow::Result<()> {
+        let req = get_req(
             "/foo/",
             Some("foo_bucket".to_string()),
             None,
@@ -268,7 +268,7 @@ mod tests {
 }
         "#;
 
-        let resp: ListResponse = serde_json::from_str(&json)?;
+        let resp: GetResponse = serde_json::from_str(&json)?;
         assert!(resp.entries.is_some());
         let entries = resp.entries.unwrap();
         assert_eq!(entries.len(), 1);
@@ -286,8 +286,8 @@ mod tests {
     }
 
     #[test]
-    fn list_file() -> anyhow::Result<()> {
-        let req = list_req("/foo/This is a file.zip", None, None, None, None, None);
+    fn get_file() -> anyhow::Result<()> {
+        let req = get_req("/foo/This is a file.zip", None, None, None, None, None);
         assert_eq!(req.path, "./bus/objects/foo/This is a file.zip");
 
         let json = r#"
@@ -315,7 +315,7 @@ mod tests {
 }
         "#;
 
-        let resp: ListResponse = serde_json::from_str(&json)?;
+        let resp: GetResponse = serde_json::from_str(&json)?;
         assert!(resp.object.is_some());
         let object = resp.object.unwrap();
         assert_eq!(object.metadata.name, "/foo/bar/test.zip");

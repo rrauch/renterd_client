@@ -17,13 +17,13 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(
+    pub async fn get_all(
         &self,
         offset: Option<NonZeroUsize>,
         limit: Option<NonZeroUsize>,
     ) -> Result<(Vec<Alert>, bool), Error> {
-        let req = list_req(offset, limit);
-        let response: ListResponse = self.inner.send_api_request(&req).await?.json().await?;
+        let req = get_all_req(offset, limit);
+        let response: GetAllResponse = self.inner.send_api_request(&req).await?.json().await?;
 
         Ok((response.alerts.unwrap_or(vec![]), response.has_more))
     }
@@ -41,7 +41,7 @@ impl Api {
     }
 }
 
-fn list_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
+fn get_all_req(offset: Option<NonZeroUsize>, limit: Option<NonZeroUsize>) -> ApiRequest {
     let mut params = Vec::with_capacity(2);
     if let Some(offset) = offset {
         params.push(("offset", offset.to_string()));
@@ -106,7 +106,7 @@ pub struct Alert {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ListResponse {
+struct GetAllResponse {
     alerts: Option<Vec<Alert>>,
     has_more: bool,
 }
@@ -116,20 +116,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req(None, None);
+    fn get_all() -> anyhow::Result<()> {
+        let req = get_all_req(None, None);
         assert_eq!(req.path, "./bus/alerts");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.content, None);
         assert_eq!(req.params, None);
 
-        let req = list_req(Some(10.try_into()?), None);
+        let req = get_all_req(Some(10.try_into()?), None);
         assert_eq!(req.path, "./bus/alerts");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.content, None);
         assert_eq!(req.params, Some(vec![("offset".into(), "10".into())]));
 
-        let req = list_req(Some(10.try_into()?), Some(20.try_into()?));
+        let req = get_all_req(Some(10.try_into()?), Some(20.try_into()?));
         assert_eq!(req.path, "./bus/alerts");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.content, None);
@@ -206,7 +206,7 @@ mod tests {
 
         "#;
 
-        let alerts_response: ListResponse = serde_json::from_str(&json)?;
+        let alerts_response: GetAllResponse = serde_json::from_str(&json)?;
         assert_eq!(alerts_response.has_more, false);
         let alerts: Vec<Alert> = alerts_response.alerts.unwrap();
         assert_eq!(4, alerts.len());
@@ -276,7 +276,7 @@ mod tests {
 }
 "#;
 
-        let alerts_response: ListResponse = serde_json::from_str(&json)?;
+        let alerts_response: GetAllResponse = serde_json::from_str(&json)?;
         assert!(alerts_response.alerts.is_none());
 
         Ok(())

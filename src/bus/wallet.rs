@@ -12,10 +12,10 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<Wallet, Error> {
+    pub async fn get(&self) -> Result<Wallet, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req())
+            .send_api_request(&get_req())
             .await?
             .json()
             .await?)
@@ -33,7 +33,7 @@ impl Api {
     //todo: implement missing wallet functions
 }
 
-fn list_req() -> ApiRequest {
+fn get_req() -> ApiRequest {
     ApiRequestBuilder::get("./bus/wallet").build()
 }
 
@@ -70,8 +70,8 @@ mod tests {
     use crate::RequestType;
 
     #[test]
-    fn wallet() -> anyhow::Result<()> {
-        let req = list_req();
+    fn get() -> anyhow::Result<()> {
+        let req = get_req();
         assert_eq!(req.path, "./bus/wallet");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);

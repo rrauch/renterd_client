@@ -1,4 +1,4 @@
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, FileContractId, PublicKey};
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,28 +23,60 @@ impl Api {
         }
     }
 
-    pub fn contract(&self) -> &contract::Api {
-        &self.contract
+    pub async fn contract(
+        &self,
+        contract_id: Option<FileContractId>,
+        host_key: Option<PublicKey>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> Result<Vec<contract::Metric>, Error> {
+        self.contract
+            .get_all(contract_id, host_key, start, interval, number_intervals)
+            .await
     }
 
-    pub fn churn(&self) -> &churn::Api {
-        &self.churn
+    pub async fn churn(
+        &self,
+        name: Option<String>,
+        direction: Option<String>,
+        reason: Option<String>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> Result<Vec<churn::Metric>, Error> {
+        self.churn
+            .get_all(name, direction, reason, start, interval, number_intervals)
+            .await
     }
 
-    pub fn contract_set(&self) -> &contract_set::Api {
-        &self.contract_set
+    pub async fn contract_set(
+        &self,
+        name: Option<String>,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> Result<Vec<contract_set::Metric>, Error> {
+        self.contract_set
+            .get_all(name, start, interval, number_intervals)
+            .await
     }
 
     pub fn contract_prune(&self) -> &contract_prune::Api {
         &self.contract_prune
     }
 
-    pub fn wallet(&self) -> &wallet::Api {
-        &self.wallet
+    pub async fn wallet(
+        &self,
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> Result<Vec<wallet::Metric>, Error> {
+        self.wallet.get_all(start, interval, number_intervals).await
     }
 }
 
-fn list_req(
+fn get_all_req(
     key: &str,
     mut params: Vec<(&'static str, String)>,
     start: &DateTime<Utc>,
@@ -75,7 +107,7 @@ pub mod contract {
             Self { inner }
         }
 
-        pub async fn list(
+        pub(super) async fn get_all(
             &self,
             contract_id: Option<FileContractId>,
             host_key: Option<PublicKey>,
@@ -85,7 +117,7 @@ pub mod contract {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(
+                .send_api_request(&get_all_req(
                     contract_id,
                     host_key,
                     start,
@@ -98,14 +130,14 @@ pub mod contract {
         }
     }
 
-    fn list_req(
+    fn get_all_req(
         contract_id: Option<FileContractId>,
         host_key: Option<PublicKey>,
         start: &DateTime<Utc>,
         interval: &Duration,
         number_intervals: u16,
     ) -> ApiRequest {
-        super::list_req(
+        super::get_all_req(
             "contract",
             [
                 contract_id.map(|i| ("contractID", i.to_string())),
@@ -149,7 +181,7 @@ pub mod contract {
         use super::*;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
+        fn get_all() -> anyhow::Result<()> {
             //todo: request tests
 
             let json = r#"
@@ -243,7 +275,7 @@ pub mod churn {
             Self { inner }
         }
 
-        pub async fn list(
+        pub(super) async fn get_all(
             &self,
             name: Option<String>,
             direction: Option<String>,
@@ -254,7 +286,7 @@ pub mod churn {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(
+                .send_api_request(&get_all_req(
                     name,
                     direction,
                     reason,
@@ -268,7 +300,7 @@ pub mod churn {
         }
     }
 
-    fn list_req(
+    fn get_all_req(
         name: Option<String>,
         direction: Option<String>,
         reason: Option<String>,
@@ -276,7 +308,7 @@ pub mod churn {
         interval: &Duration,
         number_intervals: u16,
     ) -> ApiRequest {
-        super::list_req(
+        super::get_all_req(
             "churn",
             [
                 name.map(|n| ("name", n)),
@@ -324,7 +356,7 @@ pub mod contract_set {
             Self { inner }
         }
 
-        pub async fn list(
+        pub(super) async fn get_all(
             &self,
             name: Option<String>,
             start: &DateTime<Utc>,
@@ -333,20 +365,20 @@ pub mod contract_set {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(name, start, interval, number_intervals))
+                .send_api_request(&get_all_req(name, start, interval, number_intervals))
                 .await?
                 .json()
                 .await?)
         }
     }
 
-    fn list_req(
+    fn get_all_req(
         name: Option<String>,
         start: &DateTime<Utc>,
         interval: &Duration,
         number_intervals: u16,
     ) -> ApiRequest {
-        super::list_req(
+        super::get_all_req(
             "contractset",
             [name.map(|n| ("name", n))].into_iter().flatten().collect(),
             start,
@@ -383,7 +415,7 @@ pub mod contract_prune {
             Self { inner }
         }
 
-        pub async fn list(
+        pub async fn get_all(
             &self,
             contract_id: Option<FileContractId>,
             host_key: Option<PublicKey>,
@@ -394,7 +426,7 @@ pub mod contract_prune {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(
+                .send_api_request(&get_all_req(
                     contract_id,
                     host_key,
                     host_version,
@@ -419,7 +451,7 @@ pub mod contract_prune {
             .build()
     }
 
-    fn list_req(
+    fn get_all_req(
         contract_id: Option<FileContractId>,
         host_key: Option<PublicKey>,
         host_version: Option<String>,
@@ -427,7 +459,7 @@ pub mod contract_prune {
         interval: &Duration,
         number_intervals: u16,
     ) -> ApiRequest {
-        super::list_req(
+        super::get_all_req(
             "contractprune",
             [
                 contract_id.map(|c| ("contractID", c.to_string())),
@@ -496,7 +528,7 @@ pub mod wallet {
             Self { inner }
         }
 
-        pub async fn list(
+        pub(super) async fn get_all(
             &self,
             start: &DateTime<Utc>,
             interval: &Duration,
@@ -504,15 +536,19 @@ pub mod wallet {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(start, interval, number_intervals))
+                .send_api_request(&get_all_req(start, interval, number_intervals))
                 .await?
                 .json()
                 .await?)
         }
     }
 
-    fn list_req(start: &DateTime<Utc>, interval: &Duration, number_intervals: u16) -> ApiRequest {
-        super::list_req("wallet", vec![], start, interval, number_intervals)
+    fn get_all_req(
+        start: &DateTime<Utc>,
+        interval: &Duration,
+        number_intervals: u16,
+    ) -> ApiRequest {
+        super::get_all_req("wallet", vec![], start, interval, number_intervals)
     }
 
     #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]

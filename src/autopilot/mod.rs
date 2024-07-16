@@ -3,9 +3,9 @@ pub mod state;
 pub mod trigger;
 
 use crate::autopilot::config::Api as ConfigApi;
-use crate::autopilot::state::Api as StateApi;
+use crate::autopilot::state::{Api as StateApi, State};
 use crate::autopilot::trigger::Api as TriggerApi;
-use crate::ClientInner;
+use crate::{ClientInner, Error};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -28,11 +28,11 @@ impl Autopilot {
         &self.config
     }
 
-    pub fn state(&self) -> &StateApi {
-        &self.state
+    pub async fn state(&self) -> Result<State, Error> {
+        self.state.get().await
     }
 
-    pub fn trigger(&self) -> &TriggerApi {
-        &self.trigger
+    pub async fn trigger(&self, force_scan: bool) -> Result<bool, Error> {
+        self.trigger.trigger(force_scan).await
     }
 }

@@ -18,10 +18,10 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self, contract_set: Option<String>) -> Result<Vec<Contract>, Error> {
+    pub async fn get_all(&self, contract_set: Option<String>) -> Result<Vec<Contract>, Error> {
         Ok(self
             .inner
-            .send_api_request(&list_req(contract_set))
+            .send_api_request(&get_all_req(contract_set))
             .await?
             .json()
             .await?)
@@ -398,7 +398,7 @@ pub struct PrunableContract {
     pub size: u64,
 }
 
-fn list_req(contract_set: Option<String>) -> ApiRequest {
+fn get_all_req(contract_set: Option<String>) -> ApiRequest {
     let params = if let Some(contract_set) = contract_set {
         Some(vec![("contractset", contract_set)])
     } else {
@@ -494,14 +494,14 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req(None);
+    fn get_all() -> anyhow::Result<()> {
+        let req = get_all_req(None);
         assert_eq!(req.path, "./bus/contracts");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);
         assert_eq!(req.content, None);
 
-        let req = list_req(Some("foo_id".to_string()));
+        let req = get_all_req(Some("foo_id".to_string()));
         assert_eq!(
             req.params,
             Some(vec![("contractset".into(), "foo_id".into())])

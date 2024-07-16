@@ -39,12 +39,12 @@ impl Worker {
             .await?)
     }
 
-    pub fn memory(&self) -> &MemoryApi {
-        &self.memory
+    pub async fn memory(&self) -> Result<memory::Memory, Error> {
+        self.memory.get().await
     }
 
-    pub fn state(&self) -> &StateApi {
-        &self.state
+    pub async fn state(&self) -> Result<state::State, Error> {
+        self.state.get().await
     }
 
     pub fn stats(&self) -> &StatsApi {

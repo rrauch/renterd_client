@@ -1,4 +1,4 @@
-use crate::ClientInner;
+use crate::{ClientInner, Error};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -13,8 +13,8 @@ impl Api {
         }
     }
 
-    pub fn objects(&self) -> &objects::Api {
-        &self.objects
+    pub async fn objects(&self, bucket: Option<String>) -> Result<objects::Stats, Error> {
+        self.objects.get(bucket).await
     }
 }
 
@@ -34,17 +34,17 @@ pub mod objects {
             Self { inner }
         }
 
-        pub async fn list(&self, bucket: Option<String>) -> Result<Stats, Error> {
+        pub(super) async fn get(&self, bucket: Option<String>) -> Result<Stats, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req(bucket))
+                .send_api_request(&get_req(bucket))
                 .await?
                 .json()
                 .await?)
         }
     }
 
-    fn list_req(bucket: Option<String>) -> ApiRequest {
+    fn get_req(bucket: Option<String>) -> ApiRequest {
         let params = bucket.map(|b| vec![("bucket", b)]);
         ApiRequestBuilder::get("./bus/stats/objects")
             .params(params)
@@ -71,14 +71,14 @@ pub mod objects {
         use std::str::FromStr;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req(None);
+        fn get() -> anyhow::Result<()> {
+            let req = get_req(None);
             assert_eq!(req.path, "./bus/stats/objects");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);
             assert_eq!(req.content, None);
 
-            let req = list_req(Some("foo-bucket".to_string()));
+            let req = get_req(Some("foo-bucket".to_string()));
             assert_eq!(req.path, "./bus/stats/objects");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(

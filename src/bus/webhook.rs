@@ -14,10 +14,10 @@ impl Api {
         Self { inner }
     }
 
-    pub async fn list(&self) -> Result<(Vec<Webhook>, Vec<Queue>), Error> {
+    pub async fn get_all(&self) -> Result<(Vec<Webhook>, Vec<Queue>), Error> {
         let resp: Response = self
             .inner
-            .send_api_request(&list_req())
+            .send_api_request(&get_all_req())
             .await?
             .json()
             .await?;
@@ -40,7 +40,7 @@ impl Api {
     }
 }
 
-fn list_req() -> ApiRequest {
+fn get_all_req() -> ApiRequest {
     ApiRequestBuilder::get("./bus/webhooks").build()
 }
 
@@ -130,8 +130,8 @@ mod tests {
     use serde_json::Value;
 
     #[test]
-    fn list() -> anyhow::Result<()> {
-        let req = list_req();
+    fn get_all() -> anyhow::Result<()> {
+        let req = get_all_req();
         assert_eq!(req.path, "./bus/webhooks");
         assert_eq!(req.request_type, RequestType::Get);
         assert_eq!(req.params, None);

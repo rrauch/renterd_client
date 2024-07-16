@@ -58,10 +58,10 @@ pub mod contract_set {
             Self { inner }
         }
 
-        pub async fn list(&self) -> Result<Settings, Error> {
+        pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req())
+                .send_api_request(&get_req())
                 .await?
                 .json()
                 .await?)
@@ -78,7 +78,7 @@ pub mod contract_set {
         }
     }
 
-    fn list_req() -> ApiRequest {
+    fn get_req() -> ApiRequest {
         ApiRequestBuilder::get("./bus/setting/contractset").build()
     }
 
@@ -107,8 +107,8 @@ pub mod contract_set {
         use crate::RequestType;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req();
+        fn get() -> anyhow::Result<()> {
+            let req = get_req();
             assert_eq!(req.path, "./bus/setting/contractset");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);
@@ -173,10 +173,10 @@ pub mod gouging {
             Self { inner }
         }
 
-        pub async fn list(&self) -> Result<Settings, Error> {
+        pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req())
+                .send_api_request(&get_req())
                 .await?
                 .json()
                 .await?)
@@ -193,7 +193,7 @@ pub mod gouging {
         }
     }
 
-    fn list_req() -> ApiRequest {
+    fn get_req() -> ApiRequest {
         ApiRequestBuilder::get("./bus/setting/gouging").build()
     }
 
@@ -240,8 +240,8 @@ pub mod gouging {
         use crate::RequestType;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req();
+        fn get() -> anyhow::Result<()> {
+            let req = get_req();
             assert_eq!(req.path, "./bus/setting/gouging");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);
@@ -348,10 +348,10 @@ pub mod redundancy {
             Self { inner }
         }
 
-        pub async fn list(&self) -> Result<Settings, Error> {
+        pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req())
+                .send_api_request(&get_req())
                 .await?
                 .json()
                 .await?)
@@ -368,7 +368,7 @@ pub mod redundancy {
         }
     }
 
-    fn list_req() -> ApiRequest {
+    fn get_req() -> ApiRequest {
         ApiRequestBuilder::get("./bus/setting/redundancy").build()
     }
 
@@ -398,8 +398,8 @@ pub mod redundancy {
         use crate::RequestType;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req();
+        fn get() -> anyhow::Result<()> {
+            let req = get_req();
             assert_eq!(req.path, "./bus/setting/redundancy");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);
@@ -468,10 +468,10 @@ pub mod s3_authentication {
             Self { inner }
         }
 
-        pub async fn list(&self) -> Result<Settings, Error> {
+        pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req())
+                .send_api_request(&get_req())
                 .await?
                 .json()
                 .await?)
@@ -488,7 +488,7 @@ pub mod s3_authentication {
         }
     }
 
-    fn list_req() -> ApiRequest {
+    fn get_req() -> ApiRequest {
         ApiRequestBuilder::get("./bus/setting/s3authentication").build()
     }
 
@@ -517,8 +517,8 @@ pub mod s3_authentication {
         use crate::RequestType;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req();
+        fn get() -> anyhow::Result<()> {
+            let req = get_req();
             assert_eq!(req.path, "./bus/setting/s3authentication");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);
@@ -595,10 +595,10 @@ pub mod upload_packing {
             Self { inner }
         }
 
-        pub async fn list(&self) -> Result<Settings, Error> {
+        pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&list_req())
+                .send_api_request(&get_req())
                 .await?
                 .json()
                 .await?)
@@ -615,7 +615,7 @@ pub mod upload_packing {
         }
     }
 
-    fn list_req() -> ApiRequest {
+    fn get_req() -> ApiRequest {
         ApiRequestBuilder::get("./bus/setting/uploadpacking").build()
     }
 
@@ -645,8 +645,8 @@ pub mod upload_packing {
         use crate::RequestType;
 
         #[test]
-        fn list() -> anyhow::Result<()> {
-            let req = list_req();
+        fn get() -> anyhow::Result<()> {
+            let req = get_req();
             assert_eq!(req.path, "./bus/setting/uploadpacking");
             assert_eq!(req.request_type, RequestType::Get);
             assert_eq!(req.params, None);

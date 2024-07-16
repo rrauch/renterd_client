@@ -282,8 +282,8 @@ impl ClientBuilder {
         self
     }
 
-    pub fn api_password(mut self, api_password: String) -> Self {
-        self.api_password = Some(api_password);
+    pub fn api_password<S: ToString>(mut self, api_password: S) -> Self {
+        self.api_password = Some(api_password.to_string());
         self
     }
 
@@ -352,11 +352,7 @@ fn encode_object_path<S: AsRef<str>>(path: S, prefix: &'static str) -> String {
         "./bus/objects/{}",
         urlencoding::encode(path.as_ref().trim_start_matches('/'))
     )*/
-    format!(
-        "{}/{}",
-        prefix,
-        path.as_ref().trim_start_matches('/')
-    )
+    format!("{}/{}", prefix, path.as_ref().trim_start_matches('/'))
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
