@@ -4,6 +4,7 @@ use crate::worker::Worker;
 use bandwidth::Bandwidth;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, FixedOffset};
+pub use either::Either;
 use reqwest::{Client as ReqwestClient, Response};
 use serde::de::{IntoDeserializer, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -218,6 +219,8 @@ pub enum Error {
     NotDownloadableObject(String),
     #[error("the object at `{0}` is not seekable")]
     NotSeekable(String),
+    #[error("server sent an unexpected response, details: `{0}`")]
+    UnexpectedResponse(String),
 }
 
 #[derive(Error, Debug)]

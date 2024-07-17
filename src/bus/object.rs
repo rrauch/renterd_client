@@ -5,6 +5,7 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
+use either::Either;
 use futures::{StreamExt, TryStream};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,18 +31,119 @@ impl Api {
         offset: Option<usize>,
         marker: Option<String>,
         limit: Option<usize>,
-    ) -> Result<(Option<Object>, Option<Vec<Metadata>>, bool), Error> {
-        match self
-            .inner
-            .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
-            .await?
+    ) -> Result<Option<Either<Object, (Vec<Metadata>, bool)>>, Error> {
+        Ok(
+            match self
+                .inner
+                .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
+                .await?
+            {
+                Some(resp) => {
+                    let resp: GetResponse = resp.json().await?;
+                    Some(if resp.object.is_some() {
+                        Either::Left(resp.object.unwrap())
+                    } else {
+                        Either::Right((resp.entries.unwrap_or(vec![]), resp.has_more))
+                    })
+                }
+                None => None,
+            },
+        )
+    }
+
+    pub async fn get_stream<S: ToString>(
+        &self,
+        path: S,
+        batch_size: NonZeroUsize,
+        prefix: Option<String>,
+        bucket: Option<String>,
+    ) -> Result<
+        Option<Either<Object, impl TryStream<Ok = Vec<Metadata>, Error = Error> + Send + Unpin>>,
+        Error,
+    > {
+        let path = path.to_string();
+        let batch_size = batch_size.get();
+        let inner = self.inner.clone();
+
+        let (objects, has_more) = match _get(
+            &inner,
+            path.as_str(),
+            bucket.clone(),
+            prefix.clone(),
+            Some(0),
+            None,
+            Some(batch_size),
+        )
+        .await?
         {
-            Some(resp) => {
-                let response: GetResponse = resp.json().await?;
-                Ok((response.object, response.entries, response.has_more))
+            None => {
+                return Ok(None);
             }
-            None => Ok((None, None, false)),
-        }
+            Some(Either::Left(object)) => {
+                return Ok(Some(Either::Left(object)));
+            }
+            Some(Either::Right((objects, has_more))) => {
+                let objects = if objects.is_empty() {
+                    None
+                } else {
+                    Some(objects)
+                };
+                (objects, has_more)
+            }
+        };
+
+        let initial_state = (objects, has_more, 0usize);
+
+        Ok(Some(Either::Right(
+            futures::stream::try_unfold(initial_state, move |state| {
+                let inner = inner.clone();
+                let path = path.clone();
+                let prefix = prefix.clone();
+                let bucket = bucket.clone();
+
+                async move {
+                    let objects = state.0;
+                    let has_more = state.1;
+                    let mut offset = state.2;
+
+                    if let Some(objects) = objects {
+                        // initial objects not yet returned
+                        offset += objects.len();
+                        return Ok(Some((objects, (None, has_more, offset))));
+                    }
+
+                    if !has_more {
+                        // end of stream reached
+                        return Ok(None);
+                    }
+
+                    match _get(
+                        &inner,
+                        path.as_str(),
+                        bucket.clone(),
+                        prefix.clone(),
+                        Some(offset),
+                        None,
+                        Some(batch_size),
+                    )
+                    .await?
+                    {
+                        Some(Either::Right((objects, has_more))) => {
+                            if objects.is_empty() {
+                                Ok(None)
+                            } else {
+                                offset += objects.len();
+                                Ok(Some((objects, (None, has_more, offset))))
+                            }
+                        }
+                        _ => Err(Error::UnexpectedResponse(
+                            "expected a directory listing".to_string(),
+                        )),
+                    }
+                }
+            })
+            .boxed(),
+        )))
     }
 
     pub fn list(
@@ -154,6 +256,33 @@ impl Api {
             .json()
             .await?)
     }
+}
+
+async fn _get<S: AsRef<str>>(
+    inner: &ClientInner,
+    path: S,
+    bucket: Option<String>,
+    prefix: Option<String>,
+    offset: Option<usize>,
+    marker: Option<String>,
+    limit: Option<usize>,
+) -> Result<Option<Either<Object, (Vec<Metadata>, bool)>>, Error> {
+    Ok(
+        match inner
+            .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
+            .await?
+        {
+            Some(resp) => {
+                let resp: GetResponse = resp.json().await?;
+                Some(if resp.object.is_some() {
+                    Either::Left(resp.object.unwrap())
+                } else {
+                    Either::Right((resp.entries.unwrap_or(vec![]), resp.has_more))
+                })
+            }
+            None => None,
+        },
+    )
 }
 
 fn list_req(

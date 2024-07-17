@@ -18,6 +18,7 @@ bandwidth = "0.3"
 reqwest-file = { path = "vendor/reqwest-file" }
 futures = "0.3"
 tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
+either = "1.13"
 
 [dev-dependencies]
 anyhow = "1.0"
