@@ -50,26 +50,6 @@ impl Api {
         prefix: Option<String>,
         bucket: Option<String>,
     ) -> Result<impl TryStream<Ok = Vec<Metadata>, Error = Error> + Send + Unpin, Error> {
-        async fn fetch_list(
-            inner: &ClientInner,
-            prefix: &Option<String>,
-            bucket: &Option<String>,
-            marker: Option<String>,
-            batch_size: usize,
-        ) -> Result<(Vec<Metadata>, bool, Option<String>), Error> {
-            let resp: ListResponse = inner
-                .send_api_request(&list_req(
-                    prefix.clone(),
-                    bucket.clone(),
-                    marker,
-                    batch_size,
-                )?)
-                .await?
-                .json()
-                .await?;
-            Ok((resp.objects, resp.has_more, resp.next_marker))
-        }
-
         let inner = self.inner.clone();
         let batch_size = batch_size.get();
         let initial_state = (true, None);
@@ -86,8 +66,19 @@ impl Api {
                     return Ok(None);
                 }
 
-                let (objects, has_more, next_marker) =
-                    fetch_list(&inner, &prefix, &bucket, next_marker, batch_size).await?;
+                let (objects, has_more, next_marker) = {
+                    let resp: ListResponse = inner
+                        .send_api_request(&list_req(
+                            prefix.clone(),
+                            bucket.clone(),
+                            next_marker,
+                            batch_size,
+                        )?)
+                        .await?
+                        .json()
+                        .await?;
+                    (resp.objects, resp.has_more, resp.next_marker)
+                };
 
                 if objects.is_empty() {
                     return Ok(None);
