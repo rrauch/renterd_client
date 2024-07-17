@@ -91,6 +91,42 @@ impl Api {
             .await?;
         Ok(())
     }
+
+    pub async fn search(
+        &self,
+        key: Option<String>,
+        bucket: Option<String>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<Metadata>, Error> {
+        Ok(self
+            .inner
+            .send_api_request(&search_req(key, bucket, offset, limit))
+            .await?
+            .json()
+            .await?)
+    }
+}
+
+fn search_req(
+    key: Option<String>,
+    bucket: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> ApiRequest {
+    let params: Vec<_> = [
+        key.map(|k| ("key", k)),
+        bucket.map(|b| ("bucket", b)),
+        offset.map(|o| ("offset", format!("{}", o))),
+        limit.map(|l| ("limit", format!("{}", l))),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let params = (!params.is_empty()).then(|| params);
+    ApiRequestBuilder::get("./bus/search/objects")
+        .params(params)
+        .build()
 }
 
 fn rename_req(
@@ -398,6 +434,62 @@ mod tests {
         assert_eq!(req.request_type, RequestType::Post);
         assert_eq!(req.params, None);
         assert_eq!(req.content, Some(RequestContent::Json(expected)));
+        Ok(())
+    }
+
+    #[test]
+    fn search() -> anyhow::Result<()> {
+        let req = search_req(
+            Some("search_key".to_string()),
+            Some("bucket_name".to_string()),
+            Some(10),
+            Some(20),
+        );
+        assert_eq!(req.path, "./bus/search/objects");
+        assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(
+            req.params,
+            Some(vec![
+                ("key".into(), "search_key".into()),
+                ("bucket".into(), "bucket_name".into()),
+                ("offset".into(), "10".into()),
+                ("limit".into(), "20".into())
+            ])
+        );
+        assert_eq!(req.content, None);
+
+        let json = r#"
+    [
+      {
+		"eTag": "322fc5d8660ed6b05e60aa17b08897c149841991ce8070c83c84eb00b39bcdd9",
+		"health": 1,
+		"modTime": "2024-06-27T11:56:19.05151211Z",
+		"name": "/foo/bar/test.zip",
+		"size": 3657244
+	  },
+	  {
+			"eTag": "d41d8cd98f00b204e9800998ecf8427e",
+			"health": 1.2,
+			"modTime": "2024-07-05T12:37:58.998523074Z",
+			"name": "/foo/",
+			"size": 5586849,
+			"mimeType": "text/plain"
+	  }
+    ]
+        "#;
+
+        let resp: Vec<Metadata> = serde_json::from_str(&json)?;
+        assert_eq!(resp.len(), 2);
+        assert_eq!(resp.get(0).unwrap().name, "/foo/bar/test.zip");
+        assert_eq!(resp.get(0).unwrap().size, 3657244);
+        assert_eq!(
+            resp.get(1).unwrap().etag,
+            Some("d41d8cd98f00b204e9800998ecf8427e".to_string())
+        );
+        assert_eq!(
+            resp.get(1).unwrap().mime_type,
+            Some("text/plain".to_string())
+        );
         Ok(())
     }
 }
