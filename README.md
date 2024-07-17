@@ -17,7 +17,7 @@ The three main modules are `autopilot`, `bus` and `worker`. With a fluent API de
 accessible.
 For example, to call the `/bus/account/:id/resetdrift` API method you would use the following code:
 
-```rust,no_run
+```rust
 renterd.bus().account().reset_drift(&account_id).await?
 ```
 
@@ -34,7 +34,7 @@ futures-util = "0.3"
 
 And then the code:
 
-```rust,no_run
+```rust
 use futures_util::AsyncReadExt;
 
 #[tokio::main]
@@ -69,9 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Status
 
-It's still very early days. There is a large number of unit tests covering most functions, but given the sheer number of
-functions that the [renterd API](https://api.sia.tech/renterd) exposes, some issues are to be expected. Use it at your
-own risk.
+It's still early days. There is a large number of unit tests covering most functions, but given the sheer number of
+functions that the [renterd API](https://api.sia.tech/renterd) exposes, some issues are to be expected. Be governed
+accordingly.
 
 Contributions are certainly welcome :smile:
 
