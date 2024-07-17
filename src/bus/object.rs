@@ -5,9 +5,11 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
+use futures::TryStream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -40,6 +42,85 @@ impl Api {
             }
             None => Ok((None, None, false)),
         }
+    }
+
+    pub async fn list(
+        &self,
+        batch_size: NonZeroUsize,
+        prefix: Option<String>,
+        bucket: Option<String>,
+    ) -> Result<impl TryStream<Ok = Vec<Metadata>, Error = Error> + Send + Unpin, Error> {
+        struct Params {
+            batch_size: usize,
+            bucket: Option<String>,
+            prefix: Option<String>,
+        }
+
+        let params = Params {
+            batch_size: batch_size.get(),
+            bucket,
+            prefix,
+        };
+
+        let resp = _list(
+            &self.inner,
+            params.prefix.clone(),
+            params.bucket.clone(),
+            None,
+            batch_size.get(),
+        )
+        .await?;
+
+        let stream = futures::stream::try_unfold(
+            (
+                self.inner.clone(),
+                resp.has_more,
+                resp.next_marker,
+                Some(resp.objects),
+                params,
+            ),
+            |(inner, has_more, marker, objects, params)| async move {
+                let objects = match objects {
+                    Some(objects) if !objects.is_empty() => objects,
+                    _ => vec![],
+                };
+                if !objects.is_empty() {
+                    // unsent objects remaining
+                    Ok(Some((objects, (inner, has_more, marker, None, params))))
+                } else {
+                    if !has_more {
+                        // end of stream reached
+                        Ok(None)
+                    } else {
+                        // get more
+                        match _list(
+                            &inner,
+                            params.prefix.clone(),
+                            params.bucket.clone(),
+                            marker,
+                            params.batch_size,
+                        )
+                        .await
+                        {
+                            Ok(resp) if !resp.objects.is_empty() => {
+                                // results found
+                                Ok(Some((
+                                    resp.objects,
+                                    (inner, resp.has_more, resp.next_marker, None, params),
+                                )))
+                            }
+                            Err(err) => Err(err),
+                            _ => {
+                                // treat this as end of stream
+                                Ok(None)
+                            }
+                        }
+                    }
+                }
+            },
+        );
+
+        Ok(Box::pin(stream))
     }
 
     //todo: implement PUT /objects/*key function
@@ -106,6 +187,61 @@ impl Api {
             .json()
             .await?)
     }
+}
+
+async fn _list(
+    inner: &ClientInner,
+    prefix: Option<String>,
+    bucket: Option<String>,
+    marker: Option<String>,
+    limit: usize,
+) -> Result<ListResponse, Error> {
+    Ok(inner
+        .send_api_request(&list_req(prefix, bucket, marker, limit)?)
+        .await?
+        .json()
+        .await?)
+}
+
+fn list_req(
+    prefix: Option<String>,
+    bucket: Option<String>,
+    marker: Option<String>,
+    limit: usize,
+) -> Result<ApiRequest, Error> {
+    let content = Some(RequestContent::Json(
+        serde_json::to_value(ListRequest {
+            prefix,
+            marker,
+            bucket,
+            limit,
+        })
+        .map_err(|e| InvalidDataError(e.into()))?,
+    ));
+
+    Ok(ApiRequestBuilder::post("./bus/objects/list")
+        .content(content)
+        .build())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ListRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket: Option<String>,
+    limit: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    marker: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListResponse {
+    has_more: bool,
+    next_marker: Option<String>,
+    objects: Vec<Metadata>,
 }
 
 fn search_req(
@@ -366,6 +502,75 @@ mod tests {
         );
 
         //todo: test slabs
+        Ok(())
+    }
+
+    #[test]
+    fn list() -> anyhow::Result<()> {
+        let json = r#"
+        {
+    "bucket": "bucket_name",
+    "limit": 5,
+    "prefix": "/foo/",
+    "marker": "marker_name"
+}
+        "#;
+        let expected: Value = serde_json::from_str(&json)?;
+
+        let req = list_req(
+            Some("/foo/".to_string()),
+            Some("bucket_name".to_string()),
+            Some("marker_name".to_string()),
+            5,
+        )?;
+
+        assert_eq!(req.path, "./bus/objects/list");
+        assert_eq!(req.request_type, RequestType::Post);
+        assert_eq!(req.params, None);
+        assert_eq!(req.content, Some(RequestContent::Json(expected)));
+
+        let json = r#"
+        {
+  "hasMore": true,
+  "nextMarker": "next_marker_value",
+  "objects": [
+    {
+      "eTag": "322fc5d8660ed6b05e60aa17b08897c149841991ce8070c83c84eb00b39bcdd9",
+		"health": 1,
+		"modTime": "2024-06-27T11:56:19.05151211Z",
+		"name": "/foo/bar/test.zip",
+		"size": 3657244
+    },
+    {
+      "eTag": "d41d8cd98f00b204e9800998ecf8427e",
+			"health": 1.2,
+			"modTime": "2024-07-05T12:37:58.998523074Z",
+			"name": "/foo/",
+			"size": 5586849,
+			"mimeType": "text/plain"
+    }
+    ]
+    }
+        "#;
+
+        let resp: ListResponse = serde_json::from_str(&json)?;
+        assert_eq!(resp.has_more, true);
+        assert_eq!(resp.next_marker, Some("next_marker_value".to_string()));
+        assert_eq!(resp.objects.len(), 2);
+
+        assert_eq!(
+            resp.objects.get(0).unwrap().etag,
+            Some("322fc5d8660ed6b05e60aa17b08897c149841991ce8070c83c84eb00b39bcdd9".to_string())
+        );
+        assert_eq!(resp.objects.get(0).unwrap().name, "/foo/bar/test.zip");
+        assert_eq!(resp.objects.get(0).unwrap().size, 3657244);
+
+        assert_eq!(resp.objects.get(1).unwrap().name, "/foo/");
+        assert_eq!(
+            resp.objects.get(1).unwrap().mime_type,
+            Some("text/plain".to_string())
+        );
+
         Ok(())
     }
 
