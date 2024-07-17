@@ -5,7 +5,7 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
-use futures::TryStream;
+use futures::{StreamExt, TryStream};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -44,83 +44,59 @@ impl Api {
         }
     }
 
-    pub async fn list(
+    pub fn list(
         &self,
         batch_size: NonZeroUsize,
         prefix: Option<String>,
         bucket: Option<String>,
     ) -> Result<impl TryStream<Ok = Vec<Metadata>, Error = Error> + Send + Unpin, Error> {
-        struct Params {
+        async fn fetch_list(
+            inner: &ClientInner,
+            prefix: &Option<String>,
+            bucket: &Option<String>,
+            marker: Option<String>,
             batch_size: usize,
-            bucket: Option<String>,
-            prefix: Option<String>,
+        ) -> Result<(Vec<Metadata>, bool, Option<String>), Error> {
+            let resp: ListResponse = inner
+                .send_api_request(&list_req(
+                    prefix.clone(),
+                    bucket.clone(),
+                    marker,
+                    batch_size,
+                )?)
+                .await?
+                .json()
+                .await?;
+            Ok((resp.objects, resp.has_more, resp.next_marker))
         }
 
-        let params = Params {
-            batch_size: batch_size.get(),
-            bucket,
-            prefix,
-        };
+        let inner = self.inner.clone();
+        let batch_size = batch_size.get();
+        let initial_state = (true, None);
 
-        let resp = _list(
-            &self.inner,
-            params.prefix.clone(),
-            params.bucket.clone(),
-            None,
-            batch_size.get(),
-        )
-        .await?;
+        Ok(futures::stream::try_unfold(initial_state, move |state| {
+            let inner = inner.clone();
+            let prefix = prefix.clone();
+            let bucket = bucket.clone();
 
-        let stream = futures::stream::try_unfold(
-            (
-                self.inner.clone(),
-                resp.has_more,
-                resp.next_marker,
-                Some(resp.objects),
-                params,
-            ),
-            |(inner, has_more, marker, objects, params)| async move {
-                let objects = match objects {
-                    Some(objects) if !objects.is_empty() => objects,
-                    _ => vec![],
-                };
-                if !objects.is_empty() {
-                    // unsent objects remaining
-                    Ok(Some((objects, (inner, has_more, marker, None, params))))
-                } else {
-                    if !has_more {
-                        // end of stream reached
-                        Ok(None)
-                    } else {
-                        // get more
-                        match _list(
-                            &inner,
-                            params.prefix.clone(),
-                            params.bucket.clone(),
-                            marker,
-                            params.batch_size,
-                        )
-                        .await
-                        {
-                            Ok(resp) if !resp.objects.is_empty() => {
-                                // results found
-                                Ok(Some((
-                                    resp.objects,
-                                    (inner, resp.has_more, resp.next_marker, None, params),
-                                )))
-                            }
-                            Err(err) => Err(err),
-                            _ => {
-                                // treat this as end of stream
-                                Ok(None)
-                            }
-                        }
-                    }
+            async move {
+                let has_more = state.0;
+                let next_marker = state.1;
+                if !has_more {
+                    return Ok(None);
                 }
-            },
-        );
 
-        Ok(Box::pin(stream))
+                let (objects, has_more, next_marker) =
+                    fetch_list(&inner, &prefix, &bucket, next_marker, batch_size).await?;
+
+                if objects.is_empty() {
+                    return Ok(None);
+                }
+
+                Ok(Some((objects, (has_more, next_marker))))
+            }
+        })
+        .boxed())
     }
 
     //todo: implement PUT /objects/*key function
@@ -187,20 +163,6 @@ impl Api {
             .json()
             .await?)
     }
-}
-
-async fn _list(
-    inner: &ClientInner,
-    prefix: Option<String>,
-    bucket: Option<String>,
-    marker: Option<String>,
-    limit: usize,
-) -> Result<ListResponse, Error> {
-    Ok(inner
-        .send_api_request(&list_req(prefix, bucket, marker, limit)?)
-        .await?
-        .json()
-        .await?)
 }
 
 fn list_req(
