@@ -322,7 +322,9 @@ struct ListRequest {
 #[serde(rename_all = "camelCase")]
 struct ListResponse {
     has_more: bool,
+    #[serde(deserialize_with = "crate::empty_string_as_none")]
     next_marker: Option<String>,
+    #[serde(deserialize_with = "crate::deserialize_null_default")]
     objects: Vec<Metadata>,
 }
 
@@ -652,6 +654,19 @@ mod tests {
             resp.objects.get(1).unwrap().mime_type,
             Some("text/plain".to_string())
         );
+
+        let json = r#"
+        {
+	"hasMore": false,
+	"nextMarker": "",
+	"objects": null
+}
+        "#;
+
+        let resp: ListResponse = serde_json::from_str(&json)?;
+        assert_eq!(resp.has_more, false);
+        assert_eq!(resp.next_marker, None);
+        assert_eq!(resp.objects.len(), 0);
 
         Ok(())
     }
