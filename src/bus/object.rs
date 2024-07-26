@@ -3,7 +3,6 @@ use crate::{
     encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error, Percentage,
     RequestContent,
 };
-use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset};
 use either::Either;
 use futures::{StreamExt, TryStream};
@@ -35,7 +34,7 @@ impl Api {
         Ok(
             match self
                 .inner
-                .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
+                .send_api_request_optional(get_req(path, bucket, prefix, offset, marker, limit))
                 .await?
             {
                 Some(resp) => {
@@ -170,7 +169,7 @@ impl Api {
 
                 let (objects, has_more, next_marker) = {
                     let resp: ListResponse = inner
-                        .send_api_request(&list_req(
+                        .send_api_request(list_req(
                             prefix.clone(),
                             bucket.clone(),
                             next_marker,
@@ -202,7 +201,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&delete_req(path, bucket, batch))
+            .send_api_request(delete_req(path, bucket, batch))
             .await?;
         Ok(())
     }
@@ -216,7 +215,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&copy_req(
+            .send_api_request(copy_req(
                 source_path,
                 source_bucket,
                 destination_path,
@@ -237,7 +236,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&rename_req(from, to, bucket, force, mode)?)
+            .send_api_request(rename_req(from, to, bucket, force, mode)?)
             .await?;
         Ok(())
     }
@@ -251,7 +250,7 @@ impl Api {
     ) -> Result<Vec<Metadata>, Error> {
         Ok(self
             .inner
-            .send_api_request(&search_req(key, bucket, offset, limit))
+            .send_api_request(search_req(key, bucket, offset, limit))
             .await?
             .json()
             .await?)
@@ -269,7 +268,7 @@ async fn _get<S: AsRef<str>>(
 ) -> Result<Option<Either<Object, (Vec<Metadata>, bool)>>, Error> {
     Ok(
         match inner
-            .send_api_request_optional(&get_req(path, bucket, prefix, offset, marker, limit))
+            .send_api_request_optional(get_req(path, bucket, prefix, offset, marker, limit))
             .await?
         {
             Some(resp) => {
@@ -488,6 +487,7 @@ pub struct Object {
 mod tests {
     use super::*;
     use crate::RequestType;
+    use bigdecimal::BigDecimal;
     use std::str::FromStr;
 
     #[test]

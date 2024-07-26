@@ -15,21 +15,21 @@ impl Api {
     pub async fn address(&self) -> Result<String, Error> {
         Ok(self
             .inner
-            .send_api_request(&address_req())
+            .send_api_request(address_req())
             .await?
             .json()
             .await?)
     }
 
     pub async fn connect<S: AsRef<str>>(&self, address: S) -> Result<(), Error> {
-        let _ = self.inner.send_api_request(&connect_req(address)?).await?;
+        let _ = self.inner.send_api_request(connect_req(address)?).await?;
         Ok(())
     }
 
     pub async fn peers(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .inner
-            .send_api_request(&peers_req())
+            .send_api_request(peers_req())
             .await?
             .json()
             .await?)

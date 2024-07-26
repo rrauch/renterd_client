@@ -26,7 +26,7 @@ impl Api {
     ) -> Result<Vec<Host>, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_all_req(offset, limit))
+            .send_api_request(get_all_req(offset, limit))
             .await?
             .json()
             .await?)
@@ -35,7 +35,7 @@ impl Api {
     pub async fn get_by_key(&self, key: &PublicKey) -> Result<Host, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_by_key_req(key))
+            .send_api_request(get_by_key_req(key))
             .await?
             .json()
             .await?)
@@ -44,7 +44,7 @@ impl Api {
     pub async fn allowlist(&self) -> Result<Vec<PublicKey>, Error> {
         Ok(self
             .inner
-            .send_api_request(&allowlist_req())
+            .send_api_request(allowlist_req())
             .await?
             .json()
             .await?)
@@ -53,7 +53,7 @@ impl Api {
     pub async fn modify_allowlist(&self, action: ModifyAction<PublicKey>) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&modify_allowlist_req(action)?)
+            .send_api_request(modify_allowlist_req(action)?)
             .await?;
         Ok(())
     }
@@ -61,7 +61,7 @@ impl Api {
     pub async fn blocklist(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .inner
-            .send_api_request(&blocklist_req())
+            .send_api_request(blocklist_req())
             .await?
             .json()
             .await?)
@@ -70,7 +70,7 @@ impl Api {
     pub async fn modify_blocklist(&self, action: ModifyAction<String>) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&modify_blocklist_req(action)?)
+            .send_api_request(modify_blocklist_req(action)?)
             .await?;
         Ok(())
     }
@@ -85,7 +85,7 @@ impl Api {
     ) -> Result<u64, Error> {
         Ok(self
             .inner
-            .send_api_request(&remove_req(
+            .send_api_request(remove_req(
                 min_recent_scan_failures,
                 max_downtime_hours,
                 bucket,
@@ -105,7 +105,7 @@ impl Api {
     ) -> Result<Vec<HostAddress>, Error> {
         Ok(self
             .inner
-            .send_api_request(&scanning_req(offset, limit, last_scan))
+            .send_api_request(scanning_req(offset, limit, last_scan))
             .await?
             .json()
             .await?)
@@ -114,7 +114,7 @@ impl Api {
     pub async fn reset_lost_sectors(&self, key: &PublicKey) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&reset_lost_sectors_req(key))
+            .send_api_request(reset_lost_sectors_req(key))
             .await?;
         Ok(())
     }

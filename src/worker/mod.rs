@@ -33,7 +33,7 @@ impl Worker {
     pub async fn id(&self) -> Result<String, Error> {
         Ok(self
             .inner
-            .send_api_request(&ApiRequestBuilder::get("./worker/id").build())
+            .send_api_request(ApiRequestBuilder::get("./worker/id").build())
             .await?
             .json()
             .await?)

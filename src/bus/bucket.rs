@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent, RequestType};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -17,14 +17,14 @@ impl Api {
     pub async fn get_all(&self) -> Result<Vec<Bucket>, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_all_req())
+            .send_api_request(get_all_req())
             .await?
             .json()
             .await?)
     }
 
     pub async fn get_by_name<S: AsRef<str>>(&self, name: S) -> Result<Option<Bucket>, Error> {
-        match self.inner.send_api_request_optional(&get_req(name)).await? {
+        match self.inner.send_api_request_optional(get_req(name)).await? {
             Some(resp) => Ok(Some(resp.json().await?)),
             None => Ok(None),
         }
@@ -36,7 +36,7 @@ impl Api {
         public_read_access: bool,
     ) -> Result<(), Error> {
         let req = create_req(name.as_ref(), public_read_access)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -46,13 +46,13 @@ impl Api {
         public_read_access: bool,
     ) -> Result<(), Error> {
         let req = update_req(name, public_read_access)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
     pub async fn delete<S: AsRef<str>>(&self, name: S) -> Result<(), Error> {
         let req = delete_req(name);
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 }
@@ -126,6 +126,7 @@ pub struct Policy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
     use serde_json::Value;
 
     #[test]

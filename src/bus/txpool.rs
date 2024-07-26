@@ -15,7 +15,7 @@ impl Api {
     pub async fn recommended_fee(&self) -> Result<u128, Error> {
         let wrapper: U128Wrapper = self
             .inner
-            .send_api_request(&fee_req())
+            .send_api_request(fee_req())
             .await?
             .json()
             .await?;
@@ -24,7 +24,7 @@ impl Api {
 
     //todo: implement transactions
     pub async fn transactions(&self) -> Result<Vec<Value>, Error> {
-        Ok(self.inner.send_api_request(&tx_req()).await?.json().await?)
+        Ok(self.inner.send_api_request(tx_req()).await?.json().await?)
     }
 }
 

@@ -1,8 +1,6 @@
 use crate::autopilot::config::AutopilotConfig;
 use crate::Error::InvalidDataError;
-use crate::{
-    ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent, RequestType,
-};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -19,14 +17,14 @@ impl Api {
     pub async fn get_all(&self) -> Result<Vec<Autopilot>, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_all_req())
+            .send_api_request(get_all_req())
             .await?
             .json()
             .await?)
     }
 
     pub async fn get_by_id<S: AsRef<str>>(&self, id: S) -> Result<Option<Autopilot>, Error> {
-        match self.inner.send_api_request_optional(&get_req(id)).await? {
+        match self.inner.send_api_request_optional(get_req(id)).await? {
             Some(resp) => Ok(Some(resp.json().await?)),
             None => Ok(None),
         }
@@ -34,7 +32,7 @@ impl Api {
 
     pub async fn update(&self, autopilot: &Autopilot) -> Result<(), Error> {
         let req = update_req(autopilot)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -45,7 +43,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&check_host_req(id, host_key))
+            .send_api_request(check_host_req(id, host_key))
             .await?;
         Ok(())
     }
@@ -88,6 +86,7 @@ pub struct Autopilot {
 mod tests {
     use super::*;
     use crate::autopilot::config::{ContractConfig, HostConfig};
+    use crate::RequestType;
     use serde_json::Value;
 
     #[test]

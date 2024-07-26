@@ -17,7 +17,7 @@ impl Api {
     pub async fn get(&self) -> Result<AutopilotConfig, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_req())
+            .send_api_request(get_req())
             .await?
             .json()
             .await?)
@@ -26,7 +26,7 @@ impl Api {
     pub async fn update(&self, autopilot_config: &AutopilotConfig) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&update_req(autopilot_config)?)
+            .send_api_request(update_req(autopilot_config)?)
             .await?;
         Ok(())
     }

@@ -1,5 +1,4 @@
 use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, State as CommonState};
-use chrono::DateTime;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -14,12 +13,7 @@ impl Api {
     }
 
     pub(super) async fn get(&self) -> Result<State, Error> {
-        Ok(self
-            .inner
-            .send_api_request(&get_req())
-            .await?
-            .json()
-            .await?)
+        Ok(self.inner.send_api_request(get_req()).await?.json().await?)
     }
 }
 
@@ -38,6 +32,7 @@ pub struct State {
 mod tests {
     use super::*;
     use crate::RequestType;
+    use chrono::DateTime;
 
     #[test]
     fn get() -> anyhow::Result<()> {

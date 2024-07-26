@@ -61,19 +61,19 @@ pub mod contract_set {
         pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req())
+                .send_api_request(get_req())
                 .await?
                 .json()
                 .await?)
         }
 
         pub async fn update(&self, settings: &Settings) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&update_req(settings)?).await?;
+            let _ = self.inner.send_api_request(update_req(settings)?).await?;
             Ok(())
         }
 
         pub async fn delete(&self) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req()).await?;
+            let _ = self.inner.send_api_request(delete_req()).await?;
             Ok(())
         }
     }
@@ -176,19 +176,19 @@ pub mod gouging {
         pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req())
+                .send_api_request(get_req())
                 .await?
                 .json()
                 .await?)
         }
 
         pub async fn update(&self, settings: &Settings) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&update_req(settings)?).await?;
+            let _ = self.inner.send_api_request(update_req(settings)?).await?;
             Ok(())
         }
 
         pub async fn delete(&self) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req()).await?;
+            let _ = self.inner.send_api_request(delete_req()).await?;
             Ok(())
         }
     }
@@ -351,19 +351,19 @@ pub mod redundancy {
         pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req())
+                .send_api_request(get_req())
                 .await?
                 .json()
                 .await?)
         }
 
         pub async fn update(&self, settings: &Settings) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&update_req(settings)?).await?;
+            let _ = self.inner.send_api_request(update_req(settings)?).await?;
             Ok(())
         }
 
         pub async fn delete(&self) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req()).await?;
+            let _ = self.inner.send_api_request(delete_req()).await?;
             Ok(())
         }
     }
@@ -471,19 +471,19 @@ pub mod s3_authentication {
         pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req())
+                .send_api_request(get_req())
                 .await?
                 .json()
                 .await?)
         }
 
         pub async fn update(&self, settings: &Settings) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&update_req(settings)?).await?;
+            let _ = self.inner.send_api_request(update_req(settings)?).await?;
             Ok(())
         }
 
         pub async fn delete(&self) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req()).await?;
+            let _ = self.inner.send_api_request(delete_req()).await?;
             Ok(())
         }
     }
@@ -598,19 +598,19 @@ pub mod upload_packing {
         pub async fn get(&self) -> Result<Settings, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req())
+                .send_api_request(get_req())
                 .await?
                 .json()
                 .await?)
         }
 
         pub async fn update(&self, settings: &Settings) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&update_req(settings)?).await?;
+            let _ = self.inner.send_api_request(update_req(settings)?).await?;
             Ok(())
         }
 
         pub async fn delete(&self) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req()).await?;
+            let _ = self.inner.send_api_request(delete_req()).await?;
             Ok(())
         }
     }

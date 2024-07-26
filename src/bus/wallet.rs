@@ -15,7 +15,7 @@ impl Api {
     pub async fn get(&self) -> Result<Wallet, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_req())
+            .send_api_request(get_req())
             .await?
             .json()
             .await?)
@@ -24,7 +24,7 @@ impl Api {
     pub async fn outputs(&self) -> Result<Vec<Output>, Error> {
         Ok(self
             .inner
-            .send_api_request(&outputs_req())
+            .send_api_request(outputs_req())
             .await?
             .json()
             .await?)

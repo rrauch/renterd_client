@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-reqwest = { version = "0.12", features = ["rustls-tls-native-roots", "json"] }
+reqwest = { version = "0.12", features = ["rustls-tls-native-roots", "json", "stream"] }
 thiserror = "1.0"
 url = "2.5"
 zeroize = "1.8"
@@ -19,6 +19,7 @@ reqwest-file = { path = "vendor/reqwest-file" }
 futures = "0.3"
 tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 either = "1.13"
+bytes = "1.6.0"
 
 [dev-dependencies]
 anyhow = "1.0"

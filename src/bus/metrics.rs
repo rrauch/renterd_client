@@ -117,7 +117,7 @@ pub mod contract {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_all_req(
+                .send_api_request(get_all_req(
                     contract_id,
                     host_key,
                     start,
@@ -286,7 +286,7 @@ pub mod churn {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_all_req(
+                .send_api_request(get_all_req(
                     name,
                     direction,
                     reason,
@@ -365,7 +365,7 @@ pub mod contract_set {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_all_req(name, start, interval, number_intervals))
+                .send_api_request(get_all_req(name, start, interval, number_intervals))
                 .await?
                 .json()
                 .await?)
@@ -426,7 +426,7 @@ pub mod contract_prune {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_all_req(
+                .send_api_request(get_all_req(
                     contract_id,
                     host_key,
                     host_version,
@@ -440,7 +440,7 @@ pub mod contract_prune {
         }
 
         pub async fn delete(&self, cutoff: &DateTime<FixedOffset>) -> Result<(), Error> {
-            let _ = self.inner.send_api_request(&delete_req(cutoff)).await?;
+            let _ = self.inner.send_api_request(delete_req(cutoff)).await?;
             Ok(())
         }
     }
@@ -536,7 +536,7 @@ pub mod wallet {
         ) -> Result<Vec<Metric>, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_all_req(start, interval, number_intervals))
+                .send_api_request(get_all_req(start, interval, number_intervals))
                 .await?
                 .json()
                 .await?)

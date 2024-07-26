@@ -37,7 +37,7 @@ pub mod objects {
         pub(super) async fn get(&self, bucket: Option<String>) -> Result<Stats, Error> {
             Ok(self
                 .inner
-                .send_api_request(&get_req(bucket))
+                .send_api_request(get_req(bucket))
                 .await?
                 .json()
                 .await?)

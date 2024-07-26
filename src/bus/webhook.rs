@@ -17,7 +17,7 @@ impl Api {
     pub async fn get_all(&self) -> Result<(Vec<Webhook>, Vec<Queue>), Error> {
         let resp: Response = self
             .inner
-            .send_api_request(&get_all_req())
+            .send_api_request(get_all_req())
             .await?
             .json()
             .await?;
@@ -25,17 +25,17 @@ impl Api {
         Ok((resp.webhooks, resp.queues))
     }
     pub async fn register(&self, webhook: &Webhook) -> Result<(), Error> {
-        let _ = self.inner.send_api_request(&register_req(webhook)?).await?;
+        let _ = self.inner.send_api_request(register_req(webhook)?).await?;
         Ok(())
     }
 
     pub async fn delete(&self, webhook: &Webhook) -> Result<(), Error> {
-        let _ = self.inner.send_api_request(&delete_req(webhook)?).await?;
+        let _ = self.inner.send_api_request(delete_req(webhook)?).await?;
         Ok(())
     }
 
     pub async fn broadcast(&self, event: &Event) -> Result<(), Error> {
-        let _ = self.inner.send_api_request(&broadcast_req(event)?).await?;
+        let _ = self.inner.send_api_request(broadcast_req(event)?).await?;
         Ok(())
     }
 }

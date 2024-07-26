@@ -1,7 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{
-    ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent, RequestType,
-};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, PublicKey, RequestContent};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -20,7 +18,7 @@ impl Api {
     pub async fn get_all(&self) -> Result<Vec<Account>, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_all_req())
+            .send_api_request(get_all_req())
             .await?
             .json()
             .await?)
@@ -33,7 +31,7 @@ impl Api {
     ) -> Result<Account, Error> {
         Ok(self
             .inner
-            .send_api_request(&add_req(account_id, host_key)?)
+            .send_api_request(add_req(account_id, host_key)?)
             .await?
             .json()
             .await?)
@@ -47,13 +45,13 @@ impl Api {
         duration: Duration,
     ) -> Result<(Account, u64), Error> {
         let req = lock_req(account_id, host_key, exclusive, duration)?;
-        let resp: LockResponse = self.inner.send_api_request(&req).await?.json().await?;
+        let resp: LockResponse = self.inner.send_api_request(req).await?.json().await?;
         Ok((resp.account, resp.lock_id))
     }
 
     pub async fn unlock(&self, account_id: &PublicKey, lock_id: u64) -> Result<(), Error> {
         let req = unlock_req(account_id, lock_id)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -64,7 +62,7 @@ impl Api {
         amount: u128,
     ) -> Result<(), Error> {
         let req = add_balance_req(account_id, host_key, amount)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -75,7 +73,7 @@ impl Api {
         amount: u128,
     ) -> Result<(), Error> {
         let req = update_balance_req(account_id, host_key, amount)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -85,7 +83,7 @@ impl Api {
         host_key: &PublicKey,
     ) -> Result<(), Error> {
         let req = requires_sync_req(account_id, host_key)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
@@ -93,7 +91,7 @@ impl Api {
         let url = format!("./bus/account/{}/resetdrift", account_id);
         let _ = self
             .inner
-            .send_api_request(&ApiRequestBuilder::post(url).build())
+            .send_api_request(ApiRequestBuilder::post(url).build())
             .await?;
         Ok(())
     }
@@ -238,6 +236,7 @@ pub struct Account {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
     use bigdecimal::BigDecimal;
     use serde_json::Value;
     use std::str::FromStr;

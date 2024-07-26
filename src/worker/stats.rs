@@ -16,7 +16,7 @@ impl Api {
     pub async fn download(&self) -> Result<Download, Error> {
         Ok(self
             .inner
-            .send_api_request(&download_req())
+            .send_api_request(download_req())
             .await?
             .json()
             .await?)
@@ -25,7 +25,7 @@ impl Api {
     pub async fn upload(&self) -> Result<Upload, Error> {
         Ok(self
             .inner
-            .send_api_request(&upload_req())
+            .send_api_request(upload_req())
             .await?
             .json()
             .await?)

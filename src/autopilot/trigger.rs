@@ -16,7 +16,7 @@ impl Api {
     pub(super) async fn trigger(&self, force_scan: bool) -> Result<bool, Error> {
         let resp: TriggerResponse = self
             .inner
-            .send_api_request(&trigger_req(force_scan)?)
+            .send_api_request(trigger_req(force_scan)?)
             .await?
             .json()
             .await?;

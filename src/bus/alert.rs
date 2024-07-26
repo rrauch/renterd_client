@@ -1,5 +1,5 @@
 use crate::Error::InvalidDataError;
-use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Hash, RequestContent, RequestType};
+use crate::{ApiRequest, ApiRequestBuilder, ClientInner, Error, Hash, RequestContent};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,20 +23,20 @@ impl Api {
         limit: Option<NonZeroUsize>,
     ) -> Result<(Vec<Alert>, bool), Error> {
         let req = get_all_req(offset, limit);
-        let response: GetAllResponse = self.inner.send_api_request(&req).await?.json().await?;
+        let response: GetAllResponse = self.inner.send_api_request(req).await?.json().await?;
 
         Ok((response.alerts.unwrap_or(vec![]), response.has_more))
     }
 
     pub async fn dismiss(&self, alert_ids: Option<Vec<&Hash>>) -> Result<(), Error> {
         let req = dismiss_req(alert_ids)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 
     pub async fn register(&self, alert: &Alert) -> Result<(), Error> {
         let req = register_req(alert)?;
-        let _ = self.inner.send_api_request(&req).await?;
+        let _ = self.inner.send_api_request(req).await?;
         Ok(())
     }
 }
@@ -114,6 +114,7 @@ struct GetAllResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RequestType;
 
     #[test]
     fn get_all() -> anyhow::Result<()> {

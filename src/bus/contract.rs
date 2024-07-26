@@ -21,7 +21,7 @@ impl Api {
     pub async fn get_all(&self, contract_set: Option<String>) -> Result<Vec<Contract>, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_all_req(contract_set))
+            .send_api_request(get_all_req(contract_set))
             .await?
             .json()
             .await?)
@@ -30,7 +30,7 @@ impl Api {
     pub async fn get_by_id(&self, contract_id: &FileContractId) -> Result<Contract, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_by_id_req(contract_id))
+            .send_api_request(get_by_id_req(contract_id))
             .await?
             .json()
             .await?)
@@ -41,7 +41,7 @@ impl Api {
     pub async fn delete(&self, contract_id: &FileContractId) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&delete_req(contract_id))
+            .send_api_request(delete_req(contract_id))
             .await?;
         Ok(())
     }
@@ -54,7 +54,7 @@ impl Api {
     ) -> Result<u64, Error> {
         let resp: AcquireResponse = self
             .inner
-            .send_api_request(&acquire_req(contract_id, duration, priority)?)
+            .send_api_request(acquire_req(contract_id, duration, priority)?)
             .await?
             .json()
             .await?;
@@ -68,7 +68,7 @@ impl Api {
     ) -> Result<Vec<ArchivedContract>, Error> {
         Ok(self
             .inner
-            .send_api_request(&ancestors_req(contract_id, min_start_height))
+            .send_api_request(ancestors_req(contract_id, min_start_height))
             .await?
             .json()
             .await?)
@@ -77,7 +77,7 @@ impl Api {
     pub async fn prunable(&self) -> Result<Prunable, Error> {
         Ok(self
             .inner
-            .send_api_request(&prunable_req())
+            .send_api_request(prunable_req())
             .await?
             .json()
             .await?)
@@ -86,14 +86,14 @@ impl Api {
     pub async fn contract_sets(&self) -> Result<Vec<String>, Error> {
         Ok(self
             .inner
-            .send_api_request(&contract_sets_req())
+            .send_api_request(contract_sets_req())
             .await?
             .json()
             .await?)
     }
 
     pub async fn delete_all(&self) -> Result<(), Error> {
-        let _ = self.inner.send_api_request(&delete_all_req()).await?;
+        let _ = self.inner.send_api_request(delete_all_req()).await?;
         Ok(())
     }
 
@@ -103,7 +103,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&archive_req(contract_ids)?)
+            .send_api_request(archive_req(contract_ids)?)
             .await?;
         Ok(())
     }
@@ -111,7 +111,7 @@ impl Api {
     pub async fn renewed(&self, contract_id: &FileContractId) -> Result<Contract, Error> {
         Ok(self
             .inner
-            .send_api_request(&renewed_req(contract_id))
+            .send_api_request(renewed_req(contract_id))
             .await?
             .json()
             .await?)
@@ -124,7 +124,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&create_contract_set_req(name, contract_ids)?)
+            .send_api_request(create_contract_set_req(name, contract_ids)?)
             .await?;
         Ok(())
     }
@@ -132,7 +132,7 @@ impl Api {
     pub async fn delete_contract_set<S: AsRef<str>>(&self, name: S) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&delete_contract_set_req(name))
+            .send_api_request(delete_contract_set_req(name))
             .await?;
         Ok(())
     }
@@ -146,7 +146,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&update_spending_req(
+            .send_api_request(update_spending_req(
                 contract_id,
                 revision_number,
                 size,
@@ -164,7 +164,7 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&keep_alive_req(contract_id, duration, lock_id)?)
+            .send_api_request(keep_alive_req(contract_id, duration, lock_id)?)
             .await?;
         Ok(())
     }
@@ -174,7 +174,7 @@ impl Api {
     pub async fn release(&self, contract_id: &FileContractId, lock_id: u64) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&release_req(contract_id, lock_id)?)
+            .send_api_request(release_req(contract_id, lock_id)?)
             .await?;
         Ok(())
     }
@@ -185,7 +185,7 @@ impl Api {
     ) -> Result<(Option<Vec<Hash>>, Option<Vec<Hash>>), Error> {
         let resp: RootsResponse = self
             .inner
-            .send_api_request(&roots_req(contract_id))
+            .send_api_request(roots_req(contract_id))
             .await?
             .json()
             .await?;
@@ -195,7 +195,7 @@ impl Api {
     pub async fn size(&self, contract_id: &FileContractId) -> Result<(u64, u64), Error> {
         let resp: SizeResponse = self
             .inner
-            .send_api_request(&size_req(contract_id))
+            .send_api_request(size_req(contract_id))
             .await?
             .json()
             .await?;

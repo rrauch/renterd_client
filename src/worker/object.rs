@@ -1,6 +1,8 @@
 use crate::Error::InvalidDataError;
 use crate::InvalidDataError::{InvalidContentLength, InvalidLastModified};
-use crate::{encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error};
+use crate::{
+    encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent,
+};
 use chrono::{DateTime, FixedOffset};
 use futures::{AsyncRead, AsyncSeek, TryStreamExt};
 use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
@@ -26,7 +28,7 @@ impl Api {
         let object_path = path.as_ref().to_string();
         let resp = match self
             .inner
-            .send_api_request_optional(&download_head_req(path, &bucket))
+            .send_api_request_optional(download_head_req(path, &bucket))
             .await?
         {
             Some(resp) => resp,
@@ -101,10 +103,39 @@ impl Api {
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(&delete_req(path, bucket, batch))
+            .send_api_request(delete_req(path, bucket, batch))
             .await?;
         Ok(())
     }
+
+    pub async fn upload<S: AsRef<str>, U: AsyncRead + Send + Sync + Unpin + 'static>(
+        &self,
+        path: S,
+        content_type: Option<String>,
+        bucket: Option<String>,
+        stream: U,
+    ) -> Result<(), Error> {
+        let _ = self
+            .inner
+            .send_api_request(upload_req(path, content_type, bucket, stream))
+            .await?;
+        Ok(())
+    }
+}
+
+fn upload_req<S: AsRef<str>, U: AsyncRead + Send + Sync + Unpin + 'static>(
+    path: S,
+    content_type: Option<String>,
+    bucket: Option<String>,
+    stream: U,
+) -> ApiRequest {
+    let url = encode_object_path(path, "./worker/objects");
+    let params = bucket.map(|b| vec![("bucket", b)]);
+
+    ApiRequestBuilder::put(url)
+        .params(params)
+        .content(Some(RequestContent::Stream(Box::new(stream), content_type)))
+        .build()
 }
 
 fn delete_req<S: AsRef<str>>(path: S, bucket: Option<String>, batch: bool) -> ApiRequest {
@@ -149,10 +180,10 @@ pub struct DownloadableObject {
 }
 
 impl DownloadableObject {
-    pub async fn open_stream(&self) -> Result<impl AsyncRead + Send, Error> {
+    pub async fn open_stream(&self) -> Result<impl AsyncRead + Send + Unpin, Error> {
         let resp = self
             .inner
-            .send_api_request(&download_get_req(&self.path, &self.bucket))
+            .send_api_request(download_get_req(&self.path, &self.bucket))
             .await?;
 
         Ok(resp
@@ -161,14 +192,16 @@ impl DownloadableObject {
             .into_async_read())
     }
 
-    pub async fn open_seekable_stream(&self) -> Result<impl AsyncRead + AsyncSeek + Send, Error> {
+    pub async fn open_seekable_stream(
+        &self,
+    ) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin, Error> {
         if !self.seekable {
             return Err(Error::NotSeekable(self.path.clone()));
         }
 
         let req_builder = self
             .inner
-            .api_request_builder(&download_get_req(&self.path, &self.bucket))
+            .api_request_builder(download_get_req(&self.path, &self.bucket))
             .await?;
 
         let mut file: RequestFile = RequestFile::with_size(req_builder, self.length);
@@ -182,6 +215,7 @@ impl DownloadableObject {
 mod tests {
     use super::*;
     use crate::RequestType;
+    use futures::io::Cursor;
 
     #[test]
     fn download_req() -> anyhow::Result<()> {
@@ -216,6 +250,32 @@ mod tests {
             ])
         );
         assert_eq!(req.content, None);
+        Ok(())
+    }
+
+    #[test]
+    fn upload() -> anyhow::Result<()> {
+        let data: Vec<u8> = vec![0, 1, 2, 3];
+        let cursor = Cursor::new(data);
+
+        let req = upload_req(
+            "/foo/bar/file.ext",
+            Some("application/funny-bytes".to_string()),
+            Some("bucket_name".to_string()),
+            cursor,
+        );
+
+        assert_eq!(req.path, "./worker/objects/foo/bar/file.ext");
+        assert_eq!(req.request_type, RequestType::Put);
+        assert_eq!(
+            req.params,
+            Some(vec![("bucket".into(), "bucket_name".into())])
+        );
+        if let Some(RequestContent::Stream(_stream, content_type)) = req.content {
+            assert_eq!(content_type, Some("application/funny-bytes".to_string()));
+        } else {
+            panic!("expected stream content");
+        }
         Ok(())
     }
 }

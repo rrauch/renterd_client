@@ -5,13 +5,16 @@ use bandwidth::Bandwidth;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, FixedOffset};
 pub use either::Either;
-use reqwest::{Client as ReqwestClient, Response};
+use futures::{stream, AsyncRead, AsyncReadExt};
+use reqwest::header::CONTENT_TYPE;
+use reqwest::{Body, Client as ReqwestClient, Response};
 use serde::de::{IntoDeserializer, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
@@ -126,15 +129,38 @@ enum RequestType {
     Head,
 }
 
-#[derive(Debug, PartialEq, Eq)]
 enum RequestContent {
     Json(Value),
+    Stream(
+        Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        Option<String>,
+    ),
+}
+
+impl PartialEq for RequestContent {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (RequestContent::Json(json), RequestContent::Json(other_json)) => json == other_json,
+            _ => false,
+        }
+    }
+}
+
+impl Debug for RequestContent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RequestContent::Json(json) => Debug::fmt(&json, f),
+            RequestContent::Stream(_, content_type) => {
+                write!(f, "[byte stream, content_type = {:?}]", content_type)
+            }
+        }
+    }
 }
 
 impl ClientInner {
     async fn api_request_builder(
         &self,
-        request: &ApiRequest,
+        request: ApiRequest,
     ) -> Result<reqwest::RequestBuilder, crate::Error> {
         let url = self
             .api_endpoint_url
@@ -153,16 +179,32 @@ impl ClientInner {
             request_builder = request_builder.query(params);
         }
 
-        if let Some(content) = &request.content {
+        if let Some(content) = request.content {
             match content {
-                RequestContent::Json(json) => request_builder = request_builder.json(json),
+                RequestContent::Json(json) => request_builder = request_builder.json(&json),
+                RequestContent::Stream(stream, content_type) => {
+                    if let Some(content_type) = content_type {
+                        request_builder = request_builder.header(CONTENT_TYPE, content_type);
+                    }
+                    request_builder = request_builder.body(Body::wrap_stream(stream::try_unfold(
+                        (stream, vec![0u8; 64 * 1024]),
+                        |(mut stream, mut buf)| async move {
+                            let n = match Pin::new(&mut stream).read(&mut buf).await {
+                                Ok(0) => return Ok(None), // end of stream
+                                Ok(n) => n,
+                                Err(e) => return Err(e),
+                            };
+                            Ok(Some((buf[..n].to_vec(), (stream, buf))))
+                        },
+                    )));
+                }
             }
         }
 
         Ok(request_builder.basic_auth("api", Some(&self.api_password)))
     }
 
-    async fn send_api_request(&self, request: &ApiRequest) -> Result<Response, crate::Error> {
+    async fn send_api_request(&self, request: ApiRequest) -> Result<Response, crate::Error> {
         match self.send_api_request_optional(request).await {
             Ok(Some(resp)) => Ok(resp),
             Ok(None) => Err(Error::NotFoundError),
@@ -172,7 +214,7 @@ impl ClientInner {
 
     async fn send_api_request_optional(
         &self,
-        request: &ApiRequest,
+        request: ApiRequest,
     ) -> Result<Option<Response>, Error> {
         let req = self.api_request_builder(request).await?.build()?;
         let resp = self.reqwest_client.execute(req).await?;

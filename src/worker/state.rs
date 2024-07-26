@@ -15,7 +15,7 @@ impl Api {
     pub(super) async fn get(&self) -> Result<State, Error> {
         Ok(self
             .inner
-            .send_api_request(&get_req())
+            .send_api_request(get_req())
             .await?
             .json()
             .await?)

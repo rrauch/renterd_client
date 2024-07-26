@@ -16,7 +16,7 @@ impl Api {
     pub async fn state(&self) -> Result<State, Error> {
         Ok(self
             .inner
-            .send_api_request(&state_req())
+            .send_api_request(state_req())
             .await?
             .json()
             .await?)
@@ -25,7 +25,7 @@ impl Api {
     pub async fn network(&self) -> Result<State, Error> {
         Ok(self
             .inner
-            .send_api_request(&network_req())
+            .send_api_request(network_req())
             .await?
             .json()
             .await?)
@@ -34,7 +34,7 @@ impl Api {
     pub async fn sia_fund_fee(&self, payout: u128) -> Result<u128, Error> {
         let resp: U128Wrapper = self
             .inner
-            .send_api_request(&sia_fund_fee_req(payout))
+            .send_api_request(sia_fund_fee_req(payout))
             .await?
             .json()
             .await?;
