@@ -218,16 +218,24 @@ impl ClientInner {
     ) -> Result<Option<Response>, Error> {
         let req = self.api_request_builder(request).await?.build()?;
         let resp = self.reqwest_client.execute(req).await?;
-
-        if resp.status().as_u16() == 401 {
+        let status = resp.status();
+        if status.as_u16() == 401 {
             return Err(Error::AuthenticationError);
         }
 
-        if resp.status().as_u16() == 404 {
+        if status.as_u16() == 404 {
             return Ok(None);
         }
 
-        let _ = resp.error_for_status_ref()?;
+        if status.is_client_error() || status.is_server_error() {
+            let text = resp
+                .text_with_charset("utf-8")
+                .await
+                .ok()
+                .map(|s| s.trim().to_string())
+                .unwrap_or_else(|| "".to_string());
+            return Err(Error::HttpResponseError(status.as_u16(), text));
+        }
 
         Ok(Some(resp))
     }
@@ -253,6 +261,8 @@ pub enum Error {
     AuthenticationError,
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error("http response error, status code:`{0}`, text: `{1}`")]
+    HttpResponseError(u16, String),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error("server sent 404 not found")]
