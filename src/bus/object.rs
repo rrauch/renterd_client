@@ -551,7 +551,7 @@ mod tests {
 	"hasMore": false,
 	"object": {
 		"eTag": "322fc5d8660ed6b05e60aa17b08897c149841991ce8070c83c84eb00b39bcdd9",
-		"health": 1,
+		"health": 1.25,
 		"modTime": "2024-06-27T11:56:19.05151211Z",
 		"name": "/foo/bar/test.zip",
 		"size": 3657244,
@@ -559,7 +559,7 @@ mod tests {
 		"slabs": [
 			{
 				"slab": {
-					"health": 1,
+					"health": 1.25,
 					"key": "key:6317e69fb2048ed2137e245b19b91b6f037d929db17c0d9a70cb47be3544b2af",
 					"minShards": 2
 				},
@@ -582,7 +582,7 @@ mod tests {
         );
         assert_eq!(
             object.metadata.health.as_decimal(),
-            &BigDecimal::from_str("1")?
+            &BigDecimal::from_str("1.25")?
         );
 
         //todo: test slabs

@@ -865,8 +865,12 @@ where
         where
             A: MapAccess<'de>,
         {
-            //let value = map.next_value::<Number>()?;
-            match map.next_value::<String>()?.parse::<f64>() {
+            match map
+                .next_entry::<Value, String>()?
+                .ok_or(serde::de::Error::custom("Invalid number"))?
+                .1
+                .parse::<f64>()
+            {
                 Ok(v) => Ok(to_bandwidth(v)),
                 Err(_) => Err(serde::de::Error::custom("Invalid number")),
             }
@@ -975,7 +979,12 @@ impl<'de> Visitor<'de> for PercentageVisitor {
     where
         A: MapAccess<'de>,
     {
-        match BigDecimal::from_str(map.next_value::<String>()?.as_str()) {
+        match BigDecimal::from_str(
+            map.next_entry::<Value, String>()?
+                .ok_or(serde::de::Error::custom("Invalid number"))?
+                .1
+                .as_str(),
+        ) {
             Ok(bd) => Ok(self.to_percentage(bd)),
             Err(_) => Err(serde::de::Error::custom("Invalid number")),
         }
