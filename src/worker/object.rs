@@ -4,7 +4,7 @@ use crate::{
     encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent,
 };
 use chrono::{DateTime, FixedOffset};
-use futures::{AsyncRead, AsyncSeek, TryStreamExt};
+use futures::{AsyncRead, AsyncSeek, AsyncSeekExt, TryStreamExt};
 use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use reqwest_file::RequestFile;
 use std::io::SeekFrom;
@@ -206,11 +206,12 @@ impl DownloadableObject {
             .api_request_builder(download_get_req(&self.path, &self.bucket))
             .await?;
 
-        let mut file: RequestFile = RequestFile::with_size(req_builder, self.length);
+        let file: RequestFile = RequestFile::with_size(req_builder, self.length);
+        let mut file = file.compat();
         file.seek(SeekFrom::Start(initial_offset.into().unwrap_or(0)))
             .await?;
 
-        Ok(file.compat())
+        Ok(file)
     }
 }
 
