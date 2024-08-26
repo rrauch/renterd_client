@@ -7,6 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use futures::{AsyncRead, AsyncSeek, TryStreamExt};
 use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use reqwest_file::RequestFile;
+use std::io::SeekFrom;
 use std::sync::Arc;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
@@ -194,6 +195,7 @@ impl DownloadableObject {
 
     pub async fn open_seekable_stream(
         &self,
+        initial_offset: impl Into<Option<u64>>,
     ) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin, Error> {
         if !self.seekable {
             return Err(Error::NotSeekable(self.path.clone()));
@@ -205,7 +207,8 @@ impl DownloadableObject {
             .await?;
 
         let mut file: RequestFile = RequestFile::with_size(req_builder, self.length);
-        file.prepare().await?;
+        file.seek(SeekFrom::Start(initial_offset.into().unwrap_or(0)))
+            .await?;
 
         Ok(file.compat())
     }
