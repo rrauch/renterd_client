@@ -4,12 +4,9 @@ use crate::{
     encode_object_path, ApiRequest, ApiRequestBuilder, ClientInner, Error, RequestContent,
 };
 use chrono::{DateTime, FixedOffset};
-use futures::{AsyncRead, AsyncSeek, AsyncSeekExt, TryStreamExt};
+use futures::{AsyncRead, TryStreamExt};
 use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
-use reqwest_file::RequestFile;
-use std::io::SeekFrom;
 use std::sync::Arc;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 
 #[derive(Clone)]
 pub struct Api {
@@ -154,9 +151,23 @@ fn download_head_req<S: AsRef<str>>(path: S, bucket: &Option<String>) -> ApiRequ
     ApiRequestBuilder::head(path).params(params).build()
 }
 
-fn download_get_req<S: AsRef<str>>(path: S, bucket: &Option<String>) -> ApiRequest {
+fn download_get_req<S: AsRef<str>>(
+    path: S,
+    bucket: &Option<String>,
+    offset_length: Option<(u64, Option<u64>)>,
+) -> ApiRequest {
     let (path, params) = dl_req_prep(path, bucket);
-    ApiRequestBuilder::get(path).params(params).build()
+    let mut builder = ApiRequestBuilder::get(path).params(params);
+    if let Some((offset, length)) = offset_length {
+        if offset > 0 {
+            let value = match length {
+                Some(length) => format!("{}-{}", offset, length),
+                None => format!("{}-", offset),
+            };
+            builder = builder.headers(Some(vec![("bytes", value)]));
+        }
+    }
+    builder.build()
 }
 
 fn dl_req_prep<S: AsRef<str>>(
@@ -181,37 +192,29 @@ pub struct DownloadableObject {
 }
 
 impl DownloadableObject {
-    pub async fn open_stream(&self) -> Result<impl AsyncRead + Send + Unpin, Error> {
+    pub async fn open_stream(
+        &self,
+        offset: impl Into<Option<u64>>,
+    ) -> Result<impl AsyncRead + Send + Unpin, Error> {
+        let offset = offset.into();
+
+        if offset.is_some() && !self.seekable {
+            return Err(Error::NotSeekable(self.path.clone()));
+        }
+
         let resp = self
             .inner
-            .send_api_request(download_get_req(&self.path, &self.bucket))
+            .send_api_request(download_get_req(
+                &self.path,
+                &self.bucket,
+                offset.map(|o| (o, self.length)),
+            ))
             .await?;
 
         Ok(resp
             .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
             .into_async_read())
-    }
-
-    pub async fn open_seekable_stream(
-        &self,
-        initial_offset: impl Into<Option<u64>>,
-    ) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin, Error> {
-        if !self.seekable {
-            return Err(Error::NotSeekable(self.path.clone()));
-        }
-
-        let req_builder = self
-            .inner
-            .api_request_builder(download_get_req(&self.path, &self.bucket))
-            .await?;
-
-        let file: RequestFile = RequestFile::with_size(req_builder, self.length);
-        let mut file = file.compat();
-        file.seek(SeekFrom::Start(initial_offset.into().unwrap_or(0)))
-            .await?;
-
-        Ok(file)
     }
 }
 
@@ -229,14 +232,29 @@ mod tests {
         assert_eq!(req.params, None);
         assert_eq!(req.content, None);
 
-        let req = download_get_req("/foo/bar/baz/test.file", &Some("testbucket".to_string()));
+        let req = download_get_req(
+            "/foo/bar/baz/test.file",
+            &Some("testbucket".to_string()),
+            None,
+        );
         assert_eq!(req.path, "./worker/objects/foo/bar/baz/test.file");
         assert_eq!(req.request_type, RequestType::Get);
+        assert_eq!(req.headers, None);
         assert_eq!(
             req.params,
             Some(vec![("bucket".into(), "testbucket".into())])
         );
         assert_eq!(req.content, None);
+
+        let req = download_get_req(
+            "/foo/bar/baz/test.file",
+            &Some("testbucket".to_string()),
+            Some((10203, Some(1234567))),
+        );
+        assert_eq!(
+            req.headers,
+            Some(vec![("bytes".into(), "10203-1234567".into())])
+        );
 
         Ok(())
     }

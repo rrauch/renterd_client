@@ -61,6 +61,7 @@ impl Drop for ClientInner {
 struct ApiRequest {
     path: Cow<'static, str>,
     params: Option<Vec<(Cow<'static, str>, Cow<'static, str>)>>,
+    headers: Option<Vec<(Cow<'static, str>, Cow<'static, str>)>>,
     content: Option<RequestContent>,
     request_type: RequestType,
 }
@@ -76,6 +77,7 @@ impl ApiRequestBuilder {
                 request_type,
                 path: path.into(),
                 params: None,
+                headers: None,
                 content: None,
             },
         }
@@ -107,6 +109,15 @@ impl ApiRequestBuilder {
     ) -> Self {
         self.request.params =
             params.map(|v| v.into_iter().map(|(k, v)| (k.into(), v.into())).collect());
+        self
+    }
+
+    pub(crate) fn headers<K: Into<Cow<'static, str>>, V: Into<Cow<'static, str>>>(
+        mut self,
+        headers: Option<Vec<(K, V)>>,
+    ) -> Self {
+        self.request.headers =
+            headers.map(|v| v.into_iter().map(|(k, v)| (k.into(), v.into())).collect());
         self
     }
 
@@ -177,6 +188,12 @@ impl ClientInner {
 
         if let Some(params) = &request.params {
             request_builder = request_builder.query(params);
+        }
+
+        if let Some(headers) = &request.headers {
+            for (k, v) in headers {
+                request_builder = request_builder.header(k.as_ref(), v.as_ref());
+            }
         }
 
         if let Some(content) = request.content {
