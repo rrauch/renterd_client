@@ -1,23 +1,23 @@
 [package]
 name = "renterd_client"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
+bandwidth = "0.3"
+bigdecimal = { version = "0.4", features = ["serde-json"] }
+bytes = "1.7"
+chrono = { version = "0.4", features = ["serde"] }
+either = "1.13"
+futures = "0.3"
+hex = "0.4"
 reqwest = { version = "0.12", features = ["rustls-tls-native-roots", "json", "stream"] }
-thiserror = "1.0"
-url = "2.5"
-zeroize = "1.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
-bigdecimal = { version = "0.4", features = ["serde-json"] }
-hex = "0.4"
-chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+url = "2.5"
 urlencoding = "2.1"
-bandwidth = "0.3"
-futures = "0.3"
-either = "1.13"
-bytes = "1.6.0"
+zeroize = "1.8"
 
 [dev-dependencies]
 anyhow = "1.0"
