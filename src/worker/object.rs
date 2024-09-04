@@ -161,10 +161,10 @@ fn download_get_req<S: AsRef<str>>(
     if let Some((offset, length)) = offset_length {
         if offset > 0 {
             let value = match length {
-                Some(length) => format!("{}-{}", offset, length),
-                None => format!("{}-", offset),
+                Some(length) if length > 0 => format!("bytes={}-{}", offset, length - 1),
+                _ => format!("bytes={}-", offset),
             };
-            builder = builder.headers(Some(vec![("bytes", value)]));
+            builder = builder.headers(Some(vec![("range", value)]));
         }
     }
     builder.build()
@@ -253,7 +253,7 @@ mod tests {
         );
         assert_eq!(
             req.headers,
-            Some(vec![("bytes".into(), "10203-1234567".into())])
+            Some(vec![("range".into(), "bytes=10203-1234566".into())])
         );
 
         Ok(())
