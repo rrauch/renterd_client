@@ -143,7 +143,7 @@ enum RequestType {
 enum RequestContent {
     Json(Value),
     Stream(
-        Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        Box<dyn AsyncRead + Send + Unpin + 'static>,
         Option<String>,
     ),
 }

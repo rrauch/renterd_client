@@ -6,18 +6,20 @@ edition = "2021"
 [dependencies]
 bandwidth = "0.3"
 bigdecimal = { version = "0.4", features = ["serde-json"] }
-bytes = "1.7"
 chrono = { version = "0.4", features = ["serde"] }
 either = "1.13"
 futures = "0.3"
 hex = "0.4"
 reqwest = { version = "0.12", features = ["rustls-tls-native-roots", "json", "stream"] }
+reqwest-file = { git = "https://github.com/rrauch/reqwest-file.git", rev = "3df2a97267a5461d65f7445ed7d5e93c65cd7f6f", features = ["futures_io"], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 thiserror = "1.0"
 url = "2.5"
-urlencoding = "2.1"
 zeroize = "1.8"
+
+[features]
+seek = ["dep:reqwest-file"]
 
 [dev-dependencies]
 anyhow = "1.0"

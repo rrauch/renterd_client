@@ -8,6 +8,13 @@ use futures::{AsyncRead, TryStreamExt};
 use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use std::sync::Arc;
 
+#[cfg(feature = "seek")]
+use futures::{AsyncSeek, AsyncSeekExt};
+#[cfg(feature = "seek")]
+use reqwest_file::RequestFile;
+#[cfg(feature = "seek")]
+use std::io::SeekFrom;
+
 #[derive(Clone)]
 pub struct Api {
     inner: Arc<ClientInner>,
@@ -106,7 +113,7 @@ impl Api {
         Ok(())
     }
 
-    pub async fn upload<S: AsRef<str>, U: AsyncRead + Send + Sync + Unpin + 'static>(
+    pub async fn upload<S: AsRef<str>, U: AsyncRead + Send + Unpin + 'static>(
         &self,
         path: S,
         content_type: Option<String>,
@@ -121,7 +128,7 @@ impl Api {
     }
 }
 
-fn upload_req<S: AsRef<str>, U: AsyncRead + Send + Sync + Unpin + 'static>(
+fn upload_req<S: AsRef<str>, U: AsyncRead + Send + Unpin + 'static>(
     path: S,
     content_type: Option<String>,
     bucket: Option<String>,
@@ -215,6 +222,27 @@ impl DownloadableObject {
             .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
             .into_async_read())
+    }
+
+    #[cfg(feature = "seek")]
+    pub async fn open_seekable_stream(
+        &self,
+        offset: impl Into<Option<u64>>,
+    ) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin, Error> {
+        if !self.seekable {
+            return Err(Error::NotSeekable(self.path.clone()));
+        }
+
+        let req_builder = self
+            .inner
+            .api_request_builder(download_get_req(&self.path, &self.bucket, None))
+            .await?;
+
+        let mut file: RequestFile = RequestFile::with_size(req_builder, self.length);
+        file.seek(SeekFrom::Start(offset.into().unwrap_or(0)))
+            .await?;
+
+        Ok(file)
     }
 }
 
