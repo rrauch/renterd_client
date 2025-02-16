@@ -14,7 +14,7 @@ reqwest = { version = "0.12", features = ["rustls-tls-native-roots", "json", "st
 reqwest-file = { git = "https://github.com/rrauch/reqwest-file.git", rev = "3df2a97267a5461d65f7445ed7d5e93c65cd7f6f", features = ["futures_io"], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
-thiserror = "1.0"
+thiserror = "2.0"
 url = "2.5"
 zeroize = "1.8"
 
