@@ -117,12 +117,13 @@ impl Api {
         &self,
         path: S,
         content_type: Option<String>,
+        metadata: Option<Vec<(String, String)>>,
         bucket: Option<String>,
         stream: U,
     ) -> Result<(), Error> {
         let _ = self
             .inner
-            .send_api_request(upload_req(path, content_type, bucket, stream))
+            .send_api_request(upload_req(path, content_type, metadata, bucket, stream))
             .await?;
         Ok(())
     }
@@ -131,15 +132,19 @@ impl Api {
 fn upload_req<S: AsRef<str>, U: AsyncRead + Send + Unpin + 'static>(
     path: S,
     content_type: Option<String>,
+    metadata: Option<Vec<(String, String)>>,
     bucket: Option<String>,
     stream: U,
 ) -> ApiRequest {
     let url = encode_object_path(path, "./worker/objects");
     let params = bucket.map(|b| vec![("bucket", b)]);
-
     ApiRequestBuilder::put(url)
         .params(params)
-        .content(Some(RequestContent::Stream(Box::new(stream), content_type)))
+        .content(Some(RequestContent::Stream(
+            Box::new(stream),
+            content_type,
+            metadata,
+        )))
         .build()
 }
 
@@ -251,6 +256,7 @@ mod tests {
     use super::*;
     use crate::RequestType;
     use futures::io::Cursor;
+    use std::collections::HashMap;
 
     #[test]
     fn download_req() -> anyhow::Result<()> {
@@ -311,6 +317,10 @@ mod tests {
         let req = upload_req(
             "/foo/bar/file.ext",
             Some("application/funny-bytes".to_string()),
+            Some(vec![
+                ("foo".to_string(), "value1".to_string()),
+                ("bar".to_string(), "value2".to_string()),
+            ]),
             Some("bucket_name".to_string()),
             cursor,
         );
@@ -321,8 +331,13 @@ mod tests {
             req.params,
             Some(vec![("bucket".into(), "bucket_name".into())])
         );
-        if let Some(RequestContent::Stream(_stream, content_type)) = req.content {
+        if let Some(RequestContent::Stream(_stream, content_type, metadata)) = req.content {
             assert_eq!(content_type, Some("application/funny-bytes".to_string()));
+            assert!(metadata.is_some());
+            let metadata = metadata.unwrap().into_iter().collect::<HashMap<_, _>>();
+            assert_eq!(metadata.len(), 2);
+            assert_eq!(metadata.get("foo").unwrap().as_str(), "value1");
+            assert_eq!(metadata.get("bar").unwrap().as_str(), "value2");
         } else {
             panic!("expected stream content");
         }

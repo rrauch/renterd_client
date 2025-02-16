@@ -145,6 +145,7 @@ enum RequestContent {
     Stream(
         Box<dyn AsyncRead + Send + Unpin + 'static>,
         Option<String>,
+        Option<Vec<(String, String)>>,
     ),
 }
 
@@ -161,8 +162,13 @@ impl Debug for RequestContent {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             RequestContent::Json(json) => Debug::fmt(&json, f),
-            RequestContent::Stream(_, content_type) => {
-                write!(f, "[byte stream, content_type = {:?}]", content_type)
+            RequestContent::Stream(_, content_type, metadata) => {
+                write!(
+                    f,
+                    "[byte stream, content_type = {:?}, metadata = {:?}]",
+                    content_type,
+                    metadata.is_some(),
+                )
             }
         }
     }
@@ -199,9 +205,15 @@ impl ClientInner {
         if let Some(content) = request.content {
             match content {
                 RequestContent::Json(json) => request_builder = request_builder.json(&json),
-                RequestContent::Stream(stream, content_type) => {
+                RequestContent::Stream(stream, content_type, metadata) => {
                     if let Some(content_type) = content_type {
                         request_builder = request_builder.header(CONTENT_TYPE, content_type);
+                    }
+                    if let Some(metadata) = metadata {
+                        for (name, value) in metadata.into_iter() {
+                            request_builder =
+                                request_builder.header(format!("X-Sia-Meta-{}", name), value);
+                        }
                     }
                     request_builder = request_builder.body(Body::wrap_stream(stream::try_unfold(
                         (stream, vec![0u8; 64 * 1024]),
